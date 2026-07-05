@@ -1,0 +1,564 @@
+// Package repo defines persistence ports (interfaces). Concrete adapters live in
+// repo/postgres. Usecases depend on these interfaces, never on sqlc or pgx directly.
+package repo
+
+import (
+	"context"
+	"errors"
+	"time"
+
+	"github.com/google/uuid"
+
+	"github.com/student-success/backend/internal/entity"
+)
+
+var (
+	ErrNotFound      = errors.New("repo: not found")
+	ErrAlreadyExists = errors.New("repo: already exists")
+	// ErrSessionReused signals that an already-revoked refresh token was replayed — a
+	// breach indicator. RotateSession revokes the whole token family when it happens.
+	ErrSessionReused = errors.New("repo: refresh token reuse detected")
+)
+
+// ProvisionParams creates an organization plus its first admin atomically.
+type ProvisionParams struct {
+	OrgName      string
+	Slug         string
+	Plan         string
+	Email        string
+	PasswordHash string
+	FullName     string
+	Role         entity.UserRole
+}
+
+// AuthRepository is the persistence port for authentication/onboarding. It encapsulates
+// the RLS-scoped provisioning transaction so the usecase stays free of sqlc/pgx.
+type AuthRepository interface {
+	ProvisionOrgWithAdmin(ctx context.Context, p ProvisionParams) (entity.Organization, entity.User, error)
+	OrgBySlug(ctx context.Context, slug string) (entity.Organization, error)
+	OrgByID(ctx context.Context, id uuid.UUID) (entity.Organization, error)
+	SlugExists(ctx context.Context, slug string) (bool, error)
+	UserByEmailInOrg(ctx context.Context, orgID uuid.UUID, email string) (entity.User, error)
+	UserByID(ctx context.Context, orgID, id uuid.UUID) (entity.User, error)
+	// AllOrgIDs lists every center (NON-RLS) — for the cross-tenant scheduler.
+	AllOrgIDs(ctx context.Context) ([]uuid.UUID, error)
+}
+
+// RotateParams atomically replaces one refresh session with another.
+type RotateParams struct {
+	OldTokenHash string
+	NewTokenHash string
+	UserAgent    string
+	IP           string
+	ExpiresAt    time.Time
+}
+
+// RotateResult identifies the user/org of the rotated session.
+type RotateResult struct {
+	UserID uuid.UUID
+	OrgID  uuid.UUID
+}
+
+// CreateStudentParams is the input to persist a student (risk already computed by the
+// usecase). org_id is supplied separately (from the JWT), never from this struct.
+type CreateStudentParams struct {
+	Name             string
+	Phone            string
+	TelegramID       string
+	CourseName       string
+	GroupName        string
+	GroupID          *uuid.UUID
+	MentorName       string
+	StartDate        *time.Time
+	OnboardingGoal   string
+	SixMonthTarget   string
+	WeeklyStudyHours string
+	ConfidenceLevel  int
+	RiskScore        int
+	RiskTier         string
+	// CRM contact / identity / lifecycle (grounded field audit).
+	Email       string
+	BirthDate   *time.Time
+	Gender      string
+	SecondPhone string
+	Address     string
+	ParentName  string
+	ParentPhone string
+	StudentCode string
+	Status      string
+	MentorID    *uuid.UUID
+	BranchID    *uuid.UUID
+}
+
+// UpdateStudentParams is the editable profile (risk + group have their own update paths).
+type UpdateStudentParams struct {
+	Name             string
+	Phone            string
+	StartDate        *time.Time
+	OnboardingGoal   string
+	SixMonthTarget   string
+	WeeklyStudyHours string
+	ConfidenceLevel  int
+	Email            string
+	BirthDate        *time.Time
+	Gender           string
+	SecondPhone      string
+	Address          string
+	ParentName       string
+	ParentPhone      string
+	StudentCode      string
+	Status           string
+	MentorID         *uuid.UUID
+	BranchID         *uuid.UUID
+}
+
+// StudentRepository is the persistence port for students + their notes. Every method is
+// tenant-scoped via Postgres RLS (WithTenant keyed on the orgID argument).
+type StudentRepository interface {
+	Create(ctx context.Context, orgID uuid.UUID, p CreateStudentParams) (entity.Student, error)
+	Update(ctx context.Context, orgID, id uuid.UUID, p UpdateStudentParams) (entity.Student, error)
+	List(ctx context.Context, orgID uuid.UUID) ([]entity.Student, error)
+	GetByID(ctx context.Context, orgID, id uuid.UUID) (entity.Student, error)
+	UpdateRisk(ctx context.Context, orgID, id uuid.UUID, score int, tier string) error
+	AddNote(ctx context.Context, orgID, studentID uuid.UUID, author, text string) (entity.Note, error)
+	ListNotes(ctx context.Context, orgID, studentID uuid.UUID) ([]entity.Note, error)
+	AssignGroup(ctx context.Context, orgID, studentID uuid.UUID, groupID *uuid.UUID) error
+	ListByGroup(ctx context.Context, orgID, groupID uuid.UUID) ([]entity.Student, error)
+}
+
+// CreateGroupParams / UpdateGroupParams persist a group (org_id supplied separately, from the JWT).
+type CreateGroupParams struct {
+	Name         string
+	TeacherID    *uuid.UUID
+	CourseID     *uuid.UUID
+	BranchID     *uuid.UUID
+	Direction    string
+	ScheduleDays string
+	Capacity     int
+}
+
+type UpdateGroupParams struct {
+	Name         string
+	TeacherID    *uuid.UUID
+	CourseID     *uuid.UUID
+	BranchID     *uuid.UUID
+	Direction    string
+	ScheduleDays string
+	Capacity     int
+}
+
+// GroupRepository is the persistence port for student groups (RLS-scoped). Create/Update map a
+// teacher-not-in-org FK violation to ErrNotFound; Delete detaches students first (composite FK).
+type GroupRepository interface {
+	Create(ctx context.Context, orgID uuid.UUID, p CreateGroupParams) (entity.Group, error)
+	List(ctx context.Context, orgID uuid.UUID) ([]entity.Group, error)
+	GetByID(ctx context.Context, orgID, id uuid.UUID) (entity.Group, error)
+	ListByTeacher(ctx context.Context, orgID, teacherID uuid.UUID) ([]entity.Group, error)
+	Update(ctx context.Context, orgID, id uuid.UUID, p UpdateGroupParams) (entity.Group, error)
+	Delete(ctx context.Context, orgID, id uuid.UUID) error
+	CountStudents(ctx context.Context, orgID, id uuid.UUID) (int64, error)
+}
+
+// TeacherRepository manages teacher accounts (users with role 'teacher'), RLS-scoped.
+type TeacherRepository interface {
+	Create(ctx context.Context, orgID uuid.UUID, email, passwordHash, fullName string) (entity.User, error)
+	List(ctx context.Context, orgID uuid.UUID) ([]entity.User, error)
+	GetByID(ctx context.Context, orgID, id uuid.UUID) (entity.User, error)
+}
+
+// CreateSurveyParams persists a weekly check-in (org_id supplied separately, from the JWT).
+type CreateSurveyParams struct {
+	StudentID       uuid.UUID
+	WeekNumber      int
+	MotivationScore int
+	ProgressScore   int
+	BiggestObstacle string
+	Comment         string
+}
+
+// SurveyRepository persists + reads weekly surveys (RLS-scoped). Create maps a composite-FK
+// violation (student not in this tenant) to ErrNotFound.
+type SurveyRepository interface {
+	Create(ctx context.Context, orgID uuid.UUID, p CreateSurveyParams) (entity.Survey, error)
+	ListByStudent(ctx context.Context, orgID, studentID uuid.UUID) ([]entity.Survey, error)
+}
+
+// AttendanceRepository persists + reads attendance records (RLS-scoped).
+type AttendanceRepository interface {
+	Create(ctx context.Context, orgID, studentID uuid.UUID, date time.Time, present bool) (entity.AttendanceRecord, error)
+	ListByStudent(ctx context.Context, orgID, studentID uuid.UUID) ([]entity.AttendanceRecord, error)
+}
+
+// HomeworkRepository persists + reads homework-completion records (RLS-scoped).
+type HomeworkRepository interface {
+	Create(ctx context.Context, orgID, studentID uuid.UUID, date time.Time, done bool) (entity.HomeworkRecord, error)
+	ListByStudent(ctx context.Context, orgID, studentID uuid.UUID) ([]entity.HomeworkRecord, error)
+}
+
+// InterventionRepository manages auto-opened intervention tasks (RLS-scoped).
+type InterventionRepository interface {
+	Create(ctx context.Context, orgID, studentID uuid.UUID, reasons []string) (entity.InterventionTask, error)
+	CountOpenForStudent(ctx context.Context, orgID, studentID uuid.UUID) (int64, error)
+	List(ctx context.Context, orgID uuid.UUID) ([]entity.InterventionTask, error)
+	Resolve(ctx context.Context, orgID, id uuid.UUID, comment string) (entity.InterventionTask, error)
+}
+
+// RiskOutcome is the persisted result of recomputing a student's risk inside the
+// retention transaction.
+type RiskOutcome struct {
+	Score       int
+	Tier        string
+	TaskReasons []string // non-empty → ensure an open intervention task exists (idempotent)
+}
+
+// Recompute is the pure risk computation the usecase injects into the retention transaction.
+type Recompute func(st entity.Student, attendance []entity.AttendanceRecord, surveys []entity.Survey, homework []entity.HomeworkRecord) RiskOutcome
+
+// RetentionRepository performs a survey/attendance/homework write AND the risk recompute
+// (+ idempotent intervention-task auto-open) atomically in one tenant transaction — so the
+// user's data and the derived risk state can never diverge on partial failure.
+type RetentionRepository interface {
+	SubmitSurvey(ctx context.Context, orgID, studentID uuid.UUID, p CreateSurveyParams, fn Recompute) (entity.Survey, error)
+	RecordAttendance(ctx context.Context, orgID, studentID uuid.UUID, date time.Time, status string, fn Recompute) (entity.AttendanceRecord, error)
+	RecordHomework(ctx context.Context, orgID, studentID uuid.UUID, date time.Time, done bool, fn Recompute) (entity.HomeworkRecord, error)
+	// RecordAdviceFeedback upserts a mentor's useful/not-useful rating of a student's AI advice
+	// (one per mentor per student). It performs no risk recompute.
+	RecordAdviceFeedback(ctx context.Context, orgID, studentID, userID uuid.UUID, useful bool) error
+	// RecomputeStudent re-runs the risk computation (+ idempotent task open) for one student
+	// without a preceding write — used by the scheduler to apply time-based trigger rules.
+	RecomputeStudent(ctx context.Context, orgID, studentID uuid.UUID, fn Recompute) error
+}
+
+// DashboardData is a read-only aggregate snapshot for one tenant, assembled in a single
+// tenant transaction (consistent view). The usecase derives KPIs from it; it holds raw rows.
+type DashboardData struct {
+	TierCounts       map[string]int   // risk_tier → student count (e.g. "Red"→4)
+	Groups           []GroupRisk      // per-group student count + avg risk, worst first
+	Obstacles        []ObstacleCount  // most-common latest-survey obstacle, most-common first
+	HighRisk         []entity.Student // up to 10 at-risk students, highest score first
+	MotivationByWeek []WeekMotivation // avg motivation per survey week, ascending
+}
+
+// GroupRisk is the average risk of one student group.
+type GroupRisk struct {
+	Group        string
+	StudentCount int
+	AvgRisk      int
+}
+
+// ObstacleCount counts how many students report a given obstacle in their latest survey.
+type ObstacleCount struct {
+	Obstacle string
+	Count    int
+}
+
+// WeekMotivation is the average motivation score reported in a given survey week.
+type WeekMotivation struct {
+	Week          int
+	AvgMotivation float64
+}
+
+// DashboardRepository loads the tenant's dashboard aggregates (RLS-scoped, one transaction).
+type DashboardRepository interface {
+	Load(ctx context.Context, orgID uuid.UUID) (DashboardData, error)
+}
+
+// BotInvite is a resolved deep-link invite token.
+type BotInvite struct {
+	Token     string
+	OrgID     uuid.UUID
+	StudentID uuid.UUID
+	Used      bool
+	Expired   bool
+}
+
+// BotConversation is a chat's binding + FSM state. State is opaque JSON owned by the bot usecase.
+type BotConversation struct {
+	ChatID    int64
+	OrgID     uuid.UUID
+	StudentID uuid.UUID
+	Flow      string
+	Step      string
+	State     []byte
+}
+
+// LinkedChat is a Telegram chat bound to a student (for the weekly survey broadcast).
+type LinkedChat struct {
+	ChatID    int64
+	OrgID     uuid.UUID
+	StudentID uuid.UUID
+}
+
+// BotRepository persists the Telegram bot's cross-tenant state. invite_tokens + bot_conversations
+// are NON-RLS (resolved by secret token / unique chat_id before any tenant scope exists); the
+// student-binding write enters WithTenant since students is RLS-scoped.
+type BotRepository interface {
+	CreateInvite(ctx context.Context, token string, orgID, studentID, createdBy uuid.UUID, expiresAt time.Time) error
+	ResolveInvite(ctx context.Context, token string) (BotInvite, error)
+	UseInvite(ctx context.Context, token string) error
+	BindChat(ctx context.Context, chatID int64, orgID, studentID uuid.UUID) error
+	GetConversation(ctx context.Context, chatID int64) (BotConversation, error)
+	SetFlow(ctx context.Context, chatID int64, flow, step string, state []byte) error
+	SetStudentChat(ctx context.Context, orgID, studentID uuid.UUID, chatID int64) error
+	// ListLinkedChats returns every chat bound to a student (NON-RLS), for the survey broadcast.
+	ListLinkedChats(ctx context.Context) ([]LinkedChat, error)
+	// ListObstacleLabels returns a center's active "biggest obstacle" choices (ordered), for the
+	// check-in keyboard. Empty slice when the center hasn't configured any (caller uses defaults).
+	ListObstacleLabels(ctx context.Context, orgID uuid.UUID) ([]string, error)
+}
+
+// ObstacleRepository manages a center's configurable "biggest obstacle" choices (center_admin).
+type ObstacleRepository interface {
+	List(ctx context.Context, orgID uuid.UUID) ([]entity.ObstacleOption, error)
+	Create(ctx context.Context, orgID uuid.UUID, label string, position int) (entity.ObstacleOption, error)
+	Delete(ctx context.Context, orgID, id uuid.UUID) error
+}
+
+// CourseRepository manages a center's sellable courses/programs (center_admin).
+type CourseRepository interface {
+	List(ctx context.Context, orgID uuid.UUID) ([]entity.Course, error)
+	Get(ctx context.Context, orgID, id uuid.UUID) (entity.Course, error)
+	Create(ctx context.Context, orgID uuid.UUID, p CreateCourseParams) (entity.Course, error)
+	Update(ctx context.Context, orgID, id uuid.UUID, p UpdateCourseParams) (entity.Course, error)
+	Delete(ctx context.Context, orgID, id uuid.UUID) error
+}
+
+type CreateCourseParams struct {
+	Name          string
+	Level         string
+	Price         int64
+	DurationWeeks int
+	Description   string
+}
+
+type UpdateCourseParams struct {
+	Name          string
+	Level         string
+	Price         int64
+	DurationWeeks int
+	Description   string
+	IsActive      bool
+}
+
+// EnrollmentRepository manages student enrolments in groups/courses (center_admin).
+type EnrollmentRepository interface {
+	ListByStudent(ctx context.Context, orgID, studentID uuid.UUID) ([]entity.Enrollment, error)
+	Create(ctx context.Context, orgID uuid.UUID, p CreateEnrollmentParams) (entity.Enrollment, error)
+	Update(ctx context.Context, orgID, id uuid.UUID, p UpdateEnrollmentParams) (entity.Enrollment, error)
+	Delete(ctx context.Context, orgID, id uuid.UUID) error
+}
+
+type CreateEnrollmentParams struct {
+	StudentID uuid.UUID
+	GroupID   *uuid.UUID
+	CourseID  *uuid.UUID
+	Status    string
+	StartDate *time.Time
+	EndDate   *time.Time
+	Price     int64
+	Discount  int
+}
+
+type UpdateEnrollmentParams struct {
+	GroupID   *uuid.UUID
+	CourseID  *uuid.UUID
+	Status    string
+	StartDate *time.Time
+	EndDate   *time.Time
+	Price     int64
+	Discount  int
+}
+
+// FinanceRepository manages a center's invoices + payments (manual ledger). center_admin.
+type FinanceRepository interface {
+	ListInvoices(ctx context.Context, orgID, studentID uuid.UUID) ([]entity.Invoice, error)
+	CreateInvoice(ctx context.Context, orgID uuid.UUID, p CreateInvoiceParams) (entity.Invoice, error)
+	DeleteInvoice(ctx context.Context, orgID, id uuid.UUID) error
+	StudentBalance(ctx context.Context, orgID, studentID uuid.UUID) (int64, error)
+	ListPayments(ctx context.Context, orgID, studentID uuid.UUID) ([]entity.Payment, error)
+	// RecordPayment inserts a payment and bumps the invoice's paid_amount atomically.
+	RecordPayment(ctx context.Context, orgID uuid.UUID, p RecordPaymentParams) (entity.Payment, error)
+	// DeletePayment removes a payment and decrements its invoice's paid_amount atomically.
+	DeletePayment(ctx context.Context, orgID, id uuid.UUID) error
+	Summary(ctx context.Context, orgID uuid.UUID) (entity.FinanceSummary, error)
+	ListDebtors(ctx context.Context, orgID uuid.UUID) ([]entity.Debtor, error)
+	CreateExpense(ctx context.Context, orgID uuid.UUID, p CreateExpenseParams) (entity.Expense, error)
+	ListExpenses(ctx context.Context, orgID uuid.UUID, from, to time.Time) ([]entity.Expense, error)
+	DeleteExpense(ctx context.Context, orgID, id uuid.UUID) error
+	ExpensesByCategory(ctx context.Context, orgID uuid.UUID, from, to time.Time) ([]entity.CategoryTotal, error)
+}
+
+type CreateExpenseParams struct {
+	Category string
+	Amount   int64
+	SpentAt  *time.Time
+	Note     string
+}
+
+// SalaryRepository manages teacher payroll (rules + slips) and computes a period's pay basis.
+type SalaryRepository interface {
+	GetRule(ctx context.Context, orgID, teacherID uuid.UUID) (entity.SalaryRule, error)
+	SetRule(ctx context.Context, orgID, teacherID uuid.UUID, kind string, rate int64) (entity.SalaryRule, error)
+	Basis(ctx context.Context, orgID, teacherID uuid.UUID, from, to time.Time) (lessons, students, revenue int64, err error)
+	CreateSlip(ctx context.Context, orgID uuid.UUID, p SalarySlipParams) (entity.SalarySlip, error)
+	ListSlips(ctx context.Context, orgID uuid.UUID, from, to time.Time) ([]entity.SalarySlip, error)
+	MarkPaid(ctx context.Context, orgID, id uuid.UUID) (entity.SalarySlip, error)
+	DeleteSlip(ctx context.Context, orgID, id uuid.UUID) error
+}
+
+type SalarySlipParams struct {
+	TeacherID   uuid.UUID
+	PeriodStart time.Time
+	PeriodEnd   time.Time
+	Gross       int64
+	Bonus       int64
+	Deduction   int64
+	Net         int64
+	Note        string
+}
+
+type CreateInvoiceParams struct {
+	StudentID    uuid.UUID
+	EnrollmentID *uuid.UUID
+	Amount       int64
+	DueDate      *time.Time
+	Period       string
+	Note         string
+}
+
+type RecordPaymentParams struct {
+	InvoiceID uuid.UUID
+	Amount    int64
+	Method    string
+	PaidAt    *time.Time
+	Note      string
+}
+
+// LeadRepository manages the sales funnel (center_admin).
+type LeadRepository interface {
+	List(ctx context.Context, orgID uuid.UUID) ([]entity.Lead, error)
+	Get(ctx context.Context, orgID, id uuid.UUID) (entity.Lead, error)
+	Create(ctx context.Context, orgID uuid.UUID, p LeadParams) (entity.Lead, error)
+	Update(ctx context.Context, orgID, id uuid.UUID, p LeadParams) (entity.Lead, error)
+	SetStage(ctx context.Context, orgID, id uuid.UUID, stage string) (entity.Lead, error)
+	MarkConverted(ctx context.Context, orgID, id, studentID uuid.UUID) error
+	Delete(ctx context.Context, orgID, id uuid.UUID) error
+}
+
+// LeadParams is the writable lead fields (org_id from the JWT).
+type LeadParams struct {
+	Name       string
+	Phone      string
+	Email      string
+	Source     string
+	Stage      string
+	Interest   string
+	Note       string
+	AssignedTo *uuid.UUID
+}
+
+// ActivityRepository manages the polymorphic communication timeline (center_admin).
+type ActivityRepository interface {
+	List(ctx context.Context, orgID uuid.UUID, subjectType string, subjectID uuid.UUID) ([]entity.Activity, error)
+	Create(ctx context.Context, orgID uuid.UUID, p CreateActivityParams) (entity.Activity, error)
+	Delete(ctx context.Context, orgID, id uuid.UUID) error
+}
+
+type CreateActivityParams struct {
+	SubjectType string
+	SubjectID   uuid.UUID
+	Type        string
+	Body        string
+	Author      string
+}
+
+// LessonRepository manages scheduled class sessions (center_admin).
+type LessonRepository interface {
+	List(ctx context.Context, orgID uuid.UUID, from, to time.Time) ([]entity.Lesson, error)
+	Create(ctx context.Context, orgID uuid.UUID, p LessonParams) (entity.Lesson, error)
+	Update(ctx context.Context, orgID, id uuid.UUID, p LessonParams) (entity.Lesson, error)
+	Delete(ctx context.Context, orgID, id uuid.UUID) error
+	// CountRoomConflicts counts other lessons booking roomID at an overlapping time on date
+	// (excludeID = self on update, or uuid.Nil).
+	CountRoomConflicts(ctx context.Context, orgID, roomID uuid.UUID, date time.Time, start, end string, excludeID uuid.UUID) (int64, error)
+}
+
+type LessonParams struct {
+	GroupID   *uuid.UUID
+	TeacherID *uuid.UUID
+	Date      time.Time
+	StartTime string
+	EndTime   string
+	Room      string
+	RoomID    *uuid.UUID
+	Topic     string
+	Status    string
+}
+
+// RoomRepository persists physical rooms (RLS-scoped).
+type RoomRepository interface {
+	List(ctx context.Context, orgID uuid.UUID) ([]entity.Room, error)
+	Create(ctx context.Context, orgID uuid.UUID, p RoomParams) (entity.Room, error)
+	Update(ctx context.Context, orgID, id uuid.UUID, p RoomParams) (entity.Room, error)
+	Delete(ctx context.Context, orgID, id uuid.UUID) error
+}
+
+type RoomParams struct {
+	BranchID *uuid.UUID
+	Name     string
+	Capacity int
+}
+
+// CenterStats is one center (organization) plus its tenant-scoped counts, for the superadmin
+// panel. Counts are gathered by entering each org's WithTenant scope (no RLS bypass needed).
+type CenterStats struct {
+	Org      entity.Organization
+	Students int
+	Users    int
+	Green    int
+	Yellow   int
+	Red      int
+}
+
+// SuperadminRepository is the cross-tenant center-management port (super_admin only). It reads
+// the NON-RLS organizations table and gathers per-center counts inside each org's tenant scope.
+type SuperadminRepository interface {
+	ListCenters(ctx context.Context, excludeSlug string) ([]CenterStats, error)
+	GetCenter(ctx context.Context, id uuid.UUID) (CenterStats, error)
+	UpdateCenter(ctx context.Context, id uuid.UUID, plan, status string) (entity.Organization, error)
+	SetBilling(ctx context.Context, id uuid.UUID, plan, billingStatus string, trialEndsAt *time.Time) (entity.Organization, error)
+	DeleteCenter(ctx context.Context, id uuid.UUID) error
+}
+
+// BranchRepository persists branches (filiallar) within an org (RLS-scoped).
+type BranchRepository interface {
+	List(ctx context.Context, orgID uuid.UUID) ([]entity.Branch, error)
+	Create(ctx context.Context, orgID uuid.UUID, p BranchParams) (entity.Branch, error)
+	Update(ctx context.Context, orgID, id uuid.UUID, p BranchParams) (entity.Branch, error)
+	Delete(ctx context.Context, orgID, id uuid.UUID) error
+}
+
+type BranchParams struct {
+	Name     string
+	Address  string
+	Phone    string
+	IsActive bool
+}
+
+// SignupRepository persists public landing-page signup requests (platform-level, non-RLS).
+type SignupRepository interface {
+	Create(ctx context.Context, in entity.SignupRequest) (entity.SignupRequest, error)
+	List(ctx context.Context) ([]entity.SignupRequest, error)
+	SetStatus(ctx context.Context, id uuid.UUID, status string) (entity.SignupRequest, error)
+}
+
+// SessionRepository manages refresh-token sessions (not RLS-scoped; keyed by token hash).
+type SessionRepository interface {
+	CreateSession(ctx context.Context, s entity.RefreshSession) (entity.RefreshSession, error)
+	// RotateSession atomically (one tx, row-locked) verifies the old token is active,
+	// revokes it, and inserts the replacement. Replay of an already-revoked token returns
+	// ErrSessionReused after revoking every active session for that user.
+	RotateSession(ctx context.Context, p RotateParams) (RotateResult, error)
+	// DeleteExpired prunes expired sessions (called by a periodic reaper).
+	DeleteExpired(ctx context.Context) error
+}

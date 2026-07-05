@@ -1,0 +1,25 @@
+# Optional base config. Copy to config.yml to use; environment variables (and .env)
+# override every value. If config.yml is absent, the app reads config from the
+# environment only (see internal/config). Secrets belong in .env, not here.
+app:
+  name: student-success
+  environment: development
+  version: 0.1.0
+
+http:
+  host: 0.0.0.0
+  port: 8087
+  cors_origins:
+    - "*"
+
+database:
+  dsn: postgres://ssp:ssp@localhost:5432/ssp?sslmode=disable
+
+auth:
+  issuer: student-success
+  signing_key: change-me-to-a-long-random-string
+  access_ttl: 15m
+  refresh_ttl: 720h
+
+observability:
+  log_level: info

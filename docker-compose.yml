@@ -1,0 +1,52 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ssp
+      POSTGRES_PASSWORD: ssp
+      POSTGRES_DB: ssp
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ssp"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # Applies Atlas versioned migrations (db/migrations) and exits.
+  migrate:
+    image: arigaio/atlas:latest
+    command:
+      - migrate
+      - apply
+      - --url
+      - postgres://ssp:ssp@postgres:5432/ssp?sslmode=disable
+      - --dir
+      - file:///migrations
+    volumes:
+      - ./db/migrations:/migrations
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  api:
+    build:
+      context: .
+      target: api
+    env_file: .env
+    environment:
+      # App connects as the non-superuser "app" role so Postgres RLS is enforced.
+      DATABASE_URL: postgres://app:app@postgres:5432/ssp?sslmode=disable
+    ports:
+      # Host:container port both follow HTTP_PORT from .env (default 8080).
+      - "${HTTP_PORT:-8080}:${HTTP_PORT:-8080}"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+volumes:
+  pgdata:

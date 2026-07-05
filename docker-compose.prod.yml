@@ -1,0 +1,90 @@
+# Production stack: everything on one server, behind the host's nginx (which does TLS + routing).
+# Run from this directory with the 3 frontend repos as SIBLINGS of this one:
+#   /opt/staydy/staydy-backend      (this repo — run compose from here)
+#   /opt/staydy/staydy-website      (landing)
+#   /opt/staydy/staydy-app          (center app — admin + teacher, role-based)
+#   /opt/staydy/staydy-superadmin   (platform-owner panel)
+#
+#   docker compose -f docker-compose.prod.yml up -d --build
+#
+# Ports are bound to 127.0.0.1 only — nothing is exposed publicly except through nginx.
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ssp
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env.prod}
+      POSTGRES_DB: ssp
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ssp"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+    # No published port: Postgres is reachable only inside this compose network.
+
+  # Applies Atlas migrations as the superuser (creates the RLS "app" role, tables, policies) and exits.
+  migrate:
+    image: arigaio/atlas:latest
+    command:
+      - migrate
+      - apply
+      - --url
+      - postgres://ssp:${DB_PASSWORD}@postgres:5432/ssp?sslmode=disable
+      - --dir
+      - file:///migrations
+    volumes:
+      - ./db/migrations:/migrations
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  api:
+    build:
+      context: .
+      target: api
+    env_file: .env.prod
+    environment:
+      # The app connects as the non-superuser "app" role so Postgres RLS is enforced (FORCE RLS).
+      # Postgres isn't public, so the internal app:app credential is fine; rotate it if you wish.
+      DATABASE_URL: postgres://app:app@postgres:5432/ssp?sslmode=disable
+    ports:
+      - "127.0.0.1:8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  landing:
+    build:
+      context: ../staydy-website
+      args:
+        VITE_API_BASE_URL: "https://api.staydy.uz/api/v1"
+    ports:
+      - "127.0.0.1:3000:3000"
+    restart: unless-stopped
+
+  app:
+    build:
+      context: ../staydy-app
+      args:
+        VITE_API_BASE_URL: "https://api.staydy.uz/api/v1"
+    ports:
+      - "127.0.0.1:3001:3000"
+    restart: unless-stopped
+
+  admin:
+    build:
+      context: ../staydy-superadmin
+      args:
+        VITE_API_BASE_URL: "https://api.staydy.uz/api/v1"
+    ports:
+      - "127.0.0.1:3002:3000"
+    restart: unless-stopped
+
+volumes:
+  pgdata:

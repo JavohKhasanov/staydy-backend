@@ -1,0 +1,25 @@
+# Auto-deploy to the server on push to main: SSH in and run deploy.sh (pulls all 4 repos,
+# rebuilds changed images via docker compose, prunes). Needs repo secrets: SERVER_HOST,
+# SERVER_USER, SERVER_SSH_KEY (+ optional SERVER_PORT). See deploy/CI-CD-SETUP.md.
+name: Deploy
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}      # manual "Run workflow" button
+concurrency:
+  group: staydy-deploy        # never run two deploys at once
+  cancel-in-progress: false
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy over SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          port: ${{ secrets.SERVER_PORT || 22 }}
+          script: |
+            cd /opt/staydy/staydy-backend
+            ./deploy/deploy.sh

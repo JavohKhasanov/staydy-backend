@@ -1,24 +1,23 @@
 # Staydy — Production Deploy (hammasi bitta serverda)
 
-Bitta Linux server (Ubuntu 22.04+ tavsiya) + nginx + Docker. Backend + Postgres + 3 frontend hammasi
-docker-compose bilan ishlaydi; host nginx TLS + marshrutlashni bajaradi.
+Bitta Linux server + **Nginx Proxy Manager** (GUI, Docker) + Docker. Backend + Postgres + 3 frontend
+docker-compose bilan ishlaydi; NPM TLS + marshrutlashni bajaradi.
 
 ```
-Internet ─► nginx (TLS, host) ─┬─ staydy.uz        → 127.0.0.1:3000  (landing)
-                                ├─ app.staydy.uz    → 127.0.0.1:3001  (markaz app)
-                                ├─ admin.staydy.uz  → 127.0.0.1:3002  (superadmin)
-                                └─ api.staydy.uz    → 127.0.0.1:8080  (Go backend)
-docker-compose: postgres ( port ochilmagan) + migrate + api + landing + app + admin
+Internet ─► Nginx Proxy Manager (TLS) ─┬─ staydy.uz        → 172.17.0.1:3010  (landing)
+                                        ├─ app.staydy.uz    → 172.17.0.1:3011  (markaz app)
+                                        ├─ admin.staydy.uz  → 172.17.0.1:3012  (superadmin)
+                                        └─ api.staydy.uz    → 172.17.0.1:8090  (Go backend)
+docker-compose: postgres (ochilmagan) + migrate + api + landing + app + admin
 ```
 
 ---
 
 ## 0. Server tayyorligi (bir marta)
+Docker + NPM allaqachon o'rnatilgan. Faqat git kerak bo'lishi mumkin:
 ```bash
-# Docker + Compose plugin
-curl -fsSL https://get.docker.com | sh
-# nginx + certbot
-sudo apt update && sudo apt install -y nginx certbot python3-certbot-nginx git
+docker --version && docker compose version   # bo'lmasa: curl -fsSL https://get.docker.com | sh
+sudo apt update && sudo apt install -y git
 ```
 
 ## 1. DNS (domen provayderda)
@@ -45,37 +44,40 @@ git clone <SUPERADMIN_REPO_URL>   staydy-superadmin
 ## 3. Backend maxfiy kalitlari
 ```bash
 cd /opt/staydy/staydy-backend
-cp .env.prod.example .env.prod
-# .env.prod'ni tahrirlang:
+cp .env.prod.example .env
+# .env'ni tahrirlang:
 #   DB_PASSWORD      = openssl rand -base64 24
 #   JWT_SECRET       = openssl rand -base64 48
 #   GEMINI_API_KEY   = haqiqiy kalit
 #   TELEGRAM_BOT_TOKEN = bot tokeni (yoki bo'sh)
 #   CORS_ORIGINS     = https://staydy.uz,https://app.staydy.uz,https://admin.staydy.uz
-nano .env.prod
+nano .env
 ```
 
 ## 4. Stack'ni ishga tushirish
 ```bash
-docker compose --env-file .env.prod -f docker-compose.prod.yml up -d --build
-docker compose --env-file .env.prod -f docker-compose.prod.yml ps      # hammasi "running" / "healthy"
-docker compose --env-file .env.prod -f docker-compose.prod.yml logs -f api
+docker compose -f docker-compose.prod.yml up -d --build
+docker compose -f docker-compose.prod.yml ps      # hammasi "running" / "healthy"
+docker compose -f docker-compose.prod.yml logs -f api
 ```
-Bu: Postgres'ni ko'taradi → migratsiyalarni qo'llaydi (+ RLS "app" roli, superadmin seed) → api + 3 frontendni quradi va ishga tushiradi. Portlar faqat `127.0.0.1` da.
+Bu: Postgres'ni ko'taradi → migratsiyalarni qo'llaydi (+ RLS "app" roli, superadmin seed) → api + 3 frontendni quradi va ishga tushiradi. Portlar `172.17.0.1` (docker gateway) da — Nginx Proxy Manager shu orqali yetadi, tashqi internetga ochiq emas.
 
-## 5. nginx
-```bash
-sudo cp deploy/nginx-staydy.conf /etc/nginx/sites-available/staydy.uz
-sudo ln -s /etc/nginx/sites-available/staydy.uz /etc/nginx/sites-enabled/
-sudo nginx -t && sudo systemctl reload nginx
-```
+## 5. Nginx Proxy Manager — 4 ta Proxy Host qo'shing (GUI)
+Serverда NPM bor (raw nginx/certbot ISHLATILMAYDI). NPM GUI → **Hosts → Proxy Hosts → Add Proxy Host**, har domen uchun:
 
-## 6. TLS (bepul, Let's Encrypt)
-```bash
-sudo certbot --nginx \
-  -d staydy.uz -d www.staydy.uz -d app.staydy.uz -d admin.staydy.uz -d api.staydy.uz
-```
-certbot HTTP bloklarni HTTPS'ga aylantiradi + 80→443 redirekt qo'shadi. Avto-yangilanish o'rnatilgan.
+| Domain Names | Forward Host/IP | Forward Port |
+|---|---|---|
+| `staydy.uz`, `www.staydy.uz` | `172.17.0.1` | `3010` |
+| `app.staydy.uz` | `172.17.0.1` | `3011` |
+| `admin.staydy.uz` | `172.17.0.1` | `3012` |
+| `api.staydy.uz` | `172.17.0.1` | `8090` |
+
+Har host uchun:
+- **Details** tab: Scheme = `http`, Forward Hostname/IP = `172.17.0.1`, Forward Port = (jadval), **Websockets Support = ON**, Block Common Exploits = ON
+- **SSL** tab: SSL Certificate = **Request a new SSL Certificate** (Let's Encrypt), **Force SSL = ON**, HTTP/2 = ON, email + Agree to TOS
+- (api.staydy.uz uchun) **Advanced** tab ixtiyoriy: `client_max_body_size 12m;` (CSV import uchun)
+
+> Portlar mavjud chorbog/uzcode (3000/8081/8083/8085) bilan konfliktsiz tanlangan (3010/3011/3012/8090).
 
 ## 7. Tekshirish
 ```bash
@@ -86,7 +88,7 @@ Brauzerda: `staydy.uz` (landing forma → superadmin "So'rovlar"), `app.staydy.u
 
 ## 8. Xavfsizlik (birinchi kirishdan keyin)
 - **Superadmin parolini o'zgartiring** (seed: `xadminsup@gmail.com` / `@superpassw0rd$`).
-- UFW: `sudo ufw allow 22,80,443/tcp && sudo ufw enable` (postgres/app portlari localhost'da — ochiq emas).
+- Staydy portlari `172.17.0.1` da (docker gateway) — tashqi internetga ochiq emas, faqat NPM yetadi. Postgres umuman port ochmaydi.
 
 ---
 
@@ -98,12 +100,12 @@ cd /opt/staydy/staydy-backend
 
 ## Foydali buyruqlar
 ```bash
-docker compose --env-file .env.prod -f docker-compose.prod.yml logs -f api|landing|app|admin
-docker compose --env-file .env.prod -f docker-compose.prod.yml restart api
-docker compose --env-file .env.prod -f docker-compose.prod.yml down          # to'xtatish (ma'lumot saqlanadi)
+docker compose -f docker-compose.prod.yml logs -f api|landing|app|admin
+docker compose -f docker-compose.prod.yml restart api
+docker compose -f docker-compose.prod.yml down          # to'xtatish (ma'lumot saqlanadi)
 docker system df                                        # disk ishlatilishi
 # Postgres backup:
-docker compose --env-file .env.prod -f docker-compose.prod.yml exec postgres pg_dump -U ssp ssp > backup_$(date +%F).sql
+docker compose -f docker-compose.prod.yml exec postgres pg_dump -U ssp ssp > backup_$(date +%F).sql
 ```
 
 ## Disk hajmi (savolingizga javob)

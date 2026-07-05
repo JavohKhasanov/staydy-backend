@@ -45,13 +45,15 @@ services:
     build:
       context: .
       target: api
-    env_file: .env.prod
+    env_file: .env
     environment:
       # The app connects as the non-superuser "app" role so Postgres RLS is enforced (FORCE RLS).
       # Postgres isn't public, so the internal app:app credential is fine; rotate it if you wish.
       DATABASE_URL: postgres://app:app@postgres:5432/ssp?sslmode=disable
     ports:
-      - "127.0.0.1:8080:8080"
+      # Bound to the docker0 gateway so Nginx Proxy Manager (a container) reaches it via 172.17.0.1;
+      # not publicly exposed. Host port avoids the existing 808x/3000 services on this box.
+      - "172.17.0.1:8090:8080"
     depends_on:
       postgres:
         condition: service_healthy
@@ -65,7 +67,7 @@ services:
       args:
         VITE_API_BASE_URL: "https://api.staydy.uz/api/v1"
     ports:
-      - "127.0.0.1:3000:3000"
+      - "172.17.0.1:3010:3000"
     restart: unless-stopped
 
   app:
@@ -74,7 +76,7 @@ services:
       args:
         VITE_API_BASE_URL: "https://api.staydy.uz/api/v1"
     ports:
-      - "127.0.0.1:3001:3000"
+      - "172.17.0.1:3011:3000"
     restart: unless-stopped
 
   admin:
@@ -83,7 +85,7 @@ services:
       args:
         VITE_API_BASE_URL: "https://api.staydy.uz/api/v1"
     ports:
-      - "127.0.0.1:3002:3000"
+      - "172.17.0.1:3012:3000"
     restart: unless-stopped
 
 volumes:

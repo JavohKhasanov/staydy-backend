@@ -57,9 +57,9 @@ nano .env.prod
 
 ## 4. Stack'ni ishga tushirish
 ```bash
-docker compose -f docker-compose.prod.yml up -d --build
-docker compose -f docker-compose.prod.yml ps      # hammasi "running" / "healthy"
-docker compose -f docker-compose.prod.yml logs -f api
+docker compose --env-file .env.prod -f docker-compose.prod.yml up -d --build
+docker compose --env-file .env.prod -f docker-compose.prod.yml ps      # hammasi "running" / "healthy"
+docker compose --env-file .env.prod -f docker-compose.prod.yml logs -f api
 ```
 Bu: Postgres'ni ko'taradi → migratsiyalarni qo'llaydi (+ RLS "app" roli, superadmin seed) → api + 3 frontendni quradi va ishga tushiradi. Portlar faqat `127.0.0.1` da.
 
@@ -98,12 +98,12 @@ cd /opt/staydy/staydy-backend
 
 ## Foydali buyruqlar
 ```bash
-docker compose -f docker-compose.prod.yml logs -f api|landing|app|admin
-docker compose -f docker-compose.prod.yml restart api
-docker compose -f docker-compose.prod.yml down          # to'xtatish (ma'lumot saqlanadi)
+docker compose --env-file .env.prod -f docker-compose.prod.yml logs -f api|landing|app|admin
+docker compose --env-file .env.prod -f docker-compose.prod.yml restart api
+docker compose --env-file .env.prod -f docker-compose.prod.yml down          # to'xtatish (ma'lumot saqlanadi)
 docker system df                                        # disk ishlatilishi
 # Postgres backup:
-docker compose -f docker-compose.prod.yml exec postgres pg_dump -U ssp ssp > backup_$(date +%F).sql
+docker compose --env-file .env.prod -f docker-compose.prod.yml exec postgres pg_dump -U ssp ssp > backup_$(date +%F).sql
 ```
 
 ## Disk hajmi (savolingizga javob)

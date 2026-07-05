@@ -18,7 +18,7 @@ done
 
 cd "$BACKEND"
 echo "==> building + restarting containers"
-docker compose -f docker-compose.prod.yml up -d --build
+docker compose --env-file .env.prod -f docker-compose.prod.yml up -d --build
 docker image prune -f
-docker compose -f docker-compose.prod.yml ps
-echo "==> done. Logs: docker compose -f docker-compose.prod.yml logs -f api"
+docker compose --env-file .env.prod -f docker-compose.prod.yml ps
+echo "==> done. Logs: docker compose --env-file .env.prod -f docker-compose.prod.yml logs -f api"

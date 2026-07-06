@@ -376,6 +376,7 @@ func registerFinance(api huma.API, svc *financeusecase.Service, log zerolog.Logg
 		}
 		out := &expensesListOutput{}
 		out.Body.Expenses = make([]expenseResponse, 0, len(list))
+		out.Body.ByCategory = make([]expenseCategoryTotal, 0, len(cats))
 		for _, e := range list {
 			out.Body.Expenses = append(out.Body.Expenses, toExpenseResponse(e))
 			out.Body.Total += e.Amount

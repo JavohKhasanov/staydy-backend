@@ -47,6 +47,25 @@ SELECT * FROM signup_requests ORDER BY created_at DESC;
 -- name: UpdateSignupRequestStatus :one
 UPDATE signup_requests SET status = $2 WHERE id = $1 RETURNING *;
 
+-- name: ListActivePlans :many
+SELECT * FROM plans WHERE is_active = true ORDER BY sort_order ASC, created_at ASC;
+
+-- name: ListAllPlans :many
+SELECT * FROM plans ORDER BY sort_order ASC, created_at ASC;
+
+-- name: CreatePlan :one
+INSERT INTO plans (plan_key, name, price, period, tagline, features, highlighted, sort_order, is_active)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+RETURNING *;
+
+-- name: UpdatePlan :one
+UPDATE plans SET plan_key = $2, name = $3, price = $4, period = $5, tagline = $6,
+    features = $7, highlighted = $8, sort_order = $9, is_active = $10
+WHERE id = $1 RETURNING *;
+
+-- name: DeletePlan :exec
+DELETE FROM plans WHERE id = $1;
+
 -- name: CreateBranch :one
 INSERT INTO branches (org_id, name, address, phone) VALUES ($1, $2, $3, $4) RETURNING *;
 

@@ -60,6 +60,7 @@ type Querier interface {
 	// organizations and refresh_sessions are NOT under RLS (looked up before org scope exists).
 	CreateOrganization(ctx context.Context, arg CreateOrganizationParams) (Organization, error)
 	CreatePayment(ctx context.Context, arg CreatePaymentParams) (Payment, error)
+	CreatePlan(ctx context.Context, arg CreatePlanParams) (Plan, error)
 	CreateRefreshSession(ctx context.Context, arg CreateRefreshSessionParams) (RefreshSession, error)
 	CreateRoom(ctx context.Context, arg CreateRoomParams) (Room, error)
 	CreateSalarySlip(ctx context.Context, arg CreateSalarySlipParams) (SalarySlip, error)
@@ -82,6 +83,7 @@ type Querier interface {
 	DeleteObstacleOption(ctx context.Context, arg DeleteObstacleOptionParams) error
 	DeleteOrganization(ctx context.Context, id uuid.UUID) error
 	DeletePayment(ctx context.Context, arg DeletePaymentParams) error
+	DeletePlan(ctx context.Context, id uuid.UUID) error
 	DeleteRoom(ctx context.Context, id uuid.UUID) error
 	DeleteSalarySlip(ctx context.Context, id uuid.UUID) error
 	ExpensesByCategory(ctx context.Context, arg ExpensesByCategoryParams) ([]ExpensesByCategoryRow, error)
@@ -102,11 +104,13 @@ type Querier interface {
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	GetUserByID(ctx context.Context, id uuid.UUID) (User, error)
 	HighRiskStudents(ctx context.Context) ([]Student, error)
+	ListActivePlans(ctx context.Context) ([]Plan, error)
 	ListActivities(ctx context.Context, arg ListActivitiesParams) ([]Activity, error)
 	// NON-RLS: used by the cross-tenant scheduler to iterate every center.
 	ListAllOrgIDs(ctx context.Context) ([]uuid.UUID, error)
 	// NON-RLS: superadmin center list (full rows; the caller filters out the platform org).
 	ListAllOrganizations(ctx context.Context) ([]Organization, error)
+	ListAllPlans(ctx context.Context) ([]Plan, error)
 	ListAttendanceByStudent(ctx context.Context, studentID uuid.UUID) ([]AttendanceRecord, error)
 	ListBranches(ctx context.Context, orgID uuid.UUID) ([]Branch, error)
 	ListCourses(ctx context.Context, orgID uuid.UUID) ([]Course, error)
@@ -160,6 +164,7 @@ type Querier interface {
 	UpdateOpenTaskReasons(ctx context.Context, arg UpdateOpenTaskReasonsParams) error
 	UpdateOrgBilling(ctx context.Context, arg UpdateOrgBillingParams) (Organization, error)
 	UpdateOrgPlanStatus(ctx context.Context, arg UpdateOrgPlanStatusParams) (Organization, error)
+	UpdatePlan(ctx context.Context, arg UpdatePlanParams) (Plan, error)
 	UpdateRoom(ctx context.Context, arg UpdateRoomParams) (Room, error)
 	UpdateSignupRequestStatus(ctx context.Context, arg UpdateSignupRequestStatusParams) (SignupRequest, error)
 	// General profile edit (name, contact, identity, onboarding, status, mentor). Risk fields and

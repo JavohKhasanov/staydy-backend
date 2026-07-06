@@ -121,6 +121,22 @@ func mapOrg(o sqlc.Organization) entity.Organization {
 	}
 }
 
+func mapPlan(p sqlc.Plan) entity.Plan {
+	return entity.Plan{
+		ID:          p.ID,
+		PlanKey:     p.PlanKey,
+		Name:        p.Name,
+		Price:       p.Price,
+		Period:      p.Period,
+		Tagline:     p.Tagline,
+		Features:    p.Features,
+		Highlighted: p.Highlighted,
+		SortOrder:   int(p.SortOrder),
+		IsActive:    p.IsActive,
+		CreatedAt:   p.CreatedAt.Time,
+	}
+}
+
 func mapBranch(b sqlc.Branch) entity.Branch {
 	return entity.Branch{
 		ID:        b.ID,

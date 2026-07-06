@@ -33,6 +33,7 @@ import (
 	interventionusecase "github.com/student-success/backend/internal/usecase/intervention"
 	branchusecase "github.com/student-success/backend/internal/usecase/branch"
 	obstacleusecase "github.com/student-success/backend/internal/usecase/obstacle"
+	planusecase "github.com/student-success/backend/internal/usecase/plan"
 	roomusecase "github.com/student-success/backend/internal/usecase/room"
 	maintenanceusecase "github.com/student-success/backend/internal/usecase/maintenance"
 	salaryusecase "github.com/student-success/backend/internal/usecase/salary"
@@ -114,6 +115,7 @@ func New(ctx context.Context, cfg *config.Config) (*Application, error) {
 	maintenanceService := maintenanceusecase.NewService(authRepo, studentService, botService, log)
 	superadminService := superadminusecase.NewService(repopg.NewSuperadminRepository(db), authRepo)
 	signupService := signupusecase.NewService(repopg.NewSignupRepository(db))
+	planService := planusecase.NewService(repopg.NewPlanRepository(db))
 	salaryService := salaryusecase.NewService(repopg.NewSalaryRepository(db))
 	branchService := branchusecase.NewService(repopg.NewBranchRepository(db))
 	roomService := roomusecase.NewService(repopg.NewRoomRepository(db))
@@ -143,6 +145,7 @@ func New(ctx context.Context, cfg *config.Config) (*Application, error) {
 		Lessons:       lessonService,
 		Superadmin:    superadminService,
 		Signup:        signupService,
+		Plans:         planService,
 		Salary:        salaryService,
 		Branches:      branchService,
 		Rooms:         roomService,

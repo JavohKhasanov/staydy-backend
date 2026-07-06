@@ -31,6 +31,7 @@ import (
 	lessonusecase "github.com/student-success/backend/internal/usecase/lesson"
 	branchusecase "github.com/student-success/backend/internal/usecase/branch"
 	obstacleusecase "github.com/student-success/backend/internal/usecase/obstacle"
+	planusecase "github.com/student-success/backend/internal/usecase/plan"
 	roomusecase "github.com/student-success/backend/internal/usecase/room"
 	salaryusecase "github.com/student-success/backend/internal/usecase/salary"
 	signupusecase "github.com/student-success/backend/internal/usecase/signup"
@@ -62,6 +63,7 @@ type Dependencies struct {
 	Lessons       *lessonusecase.Service
 	Superadmin    *superadminusecase.Service
 	Signup        *signupusecase.Service
+	Plans         *planusecase.Service
 	Salary        *salaryusecase.Service
 	Branches      *branchusecase.Service
 	Rooms         *roomusecase.Service
@@ -148,6 +150,7 @@ func NewServer(deps Dependencies) *Server {
 	adminAPI.UseMiddleware(RequireRole(api, entity.RoleSuperAdmin))
 	registerAdmin(adminAPI, deps.Superadmin, deps.Logger)
 	registerSignup(publicAPI, adminAPI, deps.Signup, deps.Logger)
+	registerPlans(publicAPI, adminAPI, deps.Plans, deps.Logger)
 	// More tenant-scoped feature operations register on protectedAPI as they land.
 
 	return &Server{echo: e, cfg: deps.Config, log: deps.Logger}

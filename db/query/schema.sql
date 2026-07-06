@@ -45,6 +45,22 @@ CREATE TABLE branches (
 );
 CREATE INDEX idx_branches_org ON branches(org_id);
 
+-- Landing pricing plans (platform-level, NON-RLS), edited by super_admin, shown on the public site.
+CREATE TABLE plans (
+    id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    plan_key    text NOT NULL DEFAULT '',
+    name        text NOT NULL,
+    price       text NOT NULL DEFAULT '',
+    period      text NOT NULL DEFAULT '',
+    tagline     text NOT NULL DEFAULT '',
+    features    text[] NOT NULL DEFAULT '{}',
+    highlighted boolean NOT NULL DEFAULT false,
+    sort_order  int NOT NULL DEFAULT 0,
+    is_active   boolean NOT NULL DEFAULT true,
+    created_at  timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_plans_sort ON plans(sort_order);
+
 -- Back-office accounts (center admins, mentors).
 CREATE TABLE users (
     id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),

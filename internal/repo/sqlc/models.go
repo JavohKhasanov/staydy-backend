@@ -230,6 +230,20 @@ type Payment struct {
 	CreatedAt pgtype.Timestamptz `json:"created_at"`
 }
 
+type Plan struct {
+	ID          uuid.UUID          `json:"id"`
+	PlanKey     string             `json:"plan_key"`
+	Name        string             `json:"name"`
+	Price       string             `json:"price"`
+	Period      string             `json:"period"`
+	Tagline     string             `json:"tagline"`
+	Features    []string           `json:"features"`
+	Highlighted bool               `json:"highlighted"`
+	SortOrder   int32              `json:"sort_order"`
+	IsActive    bool               `json:"is_active"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+}
+
 type RefreshSession struct {
 	ID        uuid.UUID          `json:"id"`
 	UserID    uuid.UUID          `json:"user_id"`

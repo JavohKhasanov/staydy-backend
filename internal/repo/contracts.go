@@ -552,6 +552,16 @@ type SignupRepository interface {
 	SetStatus(ctx context.Context, id uuid.UUID, status string) (entity.SignupRequest, error)
 }
 
+// PlanRepository persists landing-page pricing plans (platform-level, non-RLS): the public site
+// renders the active ones; the super_admin edits them.
+type PlanRepository interface {
+	ListActive(ctx context.Context) ([]entity.Plan, error)
+	ListAll(ctx context.Context) ([]entity.Plan, error)
+	Create(ctx context.Context, in entity.Plan) (entity.Plan, error)
+	Update(ctx context.Context, in entity.Plan) (entity.Plan, error)
+	Delete(ctx context.Context, id uuid.UUID) error
+}
+
 // SessionRepository manages refresh-token sessions (not RLS-scoped; keyed by token hash).
 type SessionRepository interface {
 	CreateSession(ctx context.Context, s entity.RefreshSession) (entity.RefreshSession, error)

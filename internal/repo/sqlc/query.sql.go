@@ -937,6 +937,53 @@ func (q *Queries) CreatePayment(ctx context.Context, arg CreatePaymentParams) (P
 	return i, err
 }
 
+const createPlan = `-- name: CreatePlan :one
+INSERT INTO plans (plan_key, name, price, period, tagline, features, highlighted, sort_order, is_active)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+RETURNING id, plan_key, name, price, period, tagline, features, highlighted, sort_order, is_active, created_at
+`
+
+type CreatePlanParams struct {
+	PlanKey     string   `json:"plan_key"`
+	Name        string   `json:"name"`
+	Price       string   `json:"price"`
+	Period      string   `json:"period"`
+	Tagline     string   `json:"tagline"`
+	Features    []string `json:"features"`
+	Highlighted bool     `json:"highlighted"`
+	SortOrder   int32    `json:"sort_order"`
+	IsActive    bool     `json:"is_active"`
+}
+
+func (q *Queries) CreatePlan(ctx context.Context, arg CreatePlanParams) (Plan, error) {
+	row := q.db.QueryRow(ctx, createPlan,
+		arg.PlanKey,
+		arg.Name,
+		arg.Price,
+		arg.Period,
+		arg.Tagline,
+		arg.Features,
+		arg.Highlighted,
+		arg.SortOrder,
+		arg.IsActive,
+	)
+	var i Plan
+	err := row.Scan(
+		&i.ID,
+		&i.PlanKey,
+		&i.Name,
+		&i.Price,
+		&i.Period,
+		&i.Tagline,
+		&i.Features,
+		&i.Highlighted,
+		&i.SortOrder,
+		&i.IsActive,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const createRefreshSession = `-- name: CreateRefreshSession :one
 INSERT INTO refresh_sessions (user_id, org_id, token_hash, user_agent, ip, expires_at)
 VALUES ($1, $2, $3, $4, $5, $6)
@@ -1449,6 +1496,15 @@ func (q *Queries) DeletePayment(ctx context.Context, arg DeletePaymentParams) er
 	return err
 }
 
+const deletePlan = `-- name: DeletePlan :exec
+DELETE FROM plans WHERE id = $1
+`
+
+func (q *Queries) DeletePlan(ctx context.Context, id uuid.UUID) error {
+	_, err := q.db.Exec(ctx, deletePlan, id)
+	return err
+}
+
 const deleteRoom = `-- name: DeleteRoom :exec
 DELETE FROM rooms WHERE id = $1
 `
@@ -1958,6 +2014,42 @@ func (q *Queries) HighRiskStudents(ctx context.Context) ([]Student, error) {
 	return items, nil
 }
 
+const listActivePlans = `-- name: ListActivePlans :many
+SELECT id, plan_key, name, price, period, tagline, features, highlighted, sort_order, is_active, created_at FROM plans WHERE is_active = true ORDER BY sort_order ASC, created_at ASC
+`
+
+func (q *Queries) ListActivePlans(ctx context.Context) ([]Plan, error) {
+	rows, err := q.db.Query(ctx, listActivePlans)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Plan{}
+	for rows.Next() {
+		var i Plan
+		if err := rows.Scan(
+			&i.ID,
+			&i.PlanKey,
+			&i.Name,
+			&i.Price,
+			&i.Period,
+			&i.Tagline,
+			&i.Features,
+			&i.Highlighted,
+			&i.SortOrder,
+			&i.IsActive,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listActivities = `-- name: ListActivities :many
 SELECT id, org_id, subject_type, subject_id, type, body, author, created_at FROM activities
 WHERE org_id = $1 AND subject_type = $2 AND subject_id = $3
@@ -2048,6 +2140,42 @@ func (q *Queries) ListAllOrganizations(ctx context.Context) ([]Organization, err
 			&i.BillingStatus,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listAllPlans = `-- name: ListAllPlans :many
+SELECT id, plan_key, name, price, period, tagline, features, highlighted, sort_order, is_active, created_at FROM plans ORDER BY sort_order ASC, created_at ASC
+`
+
+func (q *Queries) ListAllPlans(ctx context.Context) ([]Plan, error) {
+	rows, err := q.db.Query(ctx, listAllPlans)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Plan{}
+	for rows.Next() {
+		var i Plan
+		if err := rows.Scan(
+			&i.ID,
+			&i.PlanKey,
+			&i.Name,
+			&i.Price,
+			&i.Period,
+			&i.Tagline,
+			&i.Features,
+			&i.Highlighted,
+			&i.SortOrder,
+			&i.IsActive,
+			&i.CreatedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -3693,6 +3821,55 @@ func (q *Queries) UpdateOrgPlanStatus(ctx context.Context, arg UpdateOrgPlanStat
 		&i.BillingStatus,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const updatePlan = `-- name: UpdatePlan :one
+UPDATE plans SET plan_key = $2, name = $3, price = $4, period = $5, tagline = $6,
+    features = $7, highlighted = $8, sort_order = $9, is_active = $10
+WHERE id = $1 RETURNING id, plan_key, name, price, period, tagline, features, highlighted, sort_order, is_active, created_at
+`
+
+type UpdatePlanParams struct {
+	ID          uuid.UUID `json:"id"`
+	PlanKey     string    `json:"plan_key"`
+	Name        string    `json:"name"`
+	Price       string    `json:"price"`
+	Period      string    `json:"period"`
+	Tagline     string    `json:"tagline"`
+	Features    []string  `json:"features"`
+	Highlighted bool      `json:"highlighted"`
+	SortOrder   int32     `json:"sort_order"`
+	IsActive    bool      `json:"is_active"`
+}
+
+func (q *Queries) UpdatePlan(ctx context.Context, arg UpdatePlanParams) (Plan, error) {
+	row := q.db.QueryRow(ctx, updatePlan,
+		arg.ID,
+		arg.PlanKey,
+		arg.Name,
+		arg.Price,
+		arg.Period,
+		arg.Tagline,
+		arg.Features,
+		arg.Highlighted,
+		arg.SortOrder,
+		arg.IsActive,
+	)
+	var i Plan
+	err := row.Scan(
+		&i.ID,
+		&i.PlanKey,
+		&i.Name,
+		&i.Price,
+		&i.Period,
+		&i.Tagline,
+		&i.Features,
+		&i.Highlighted,
+		&i.SortOrder,
+		&i.IsActive,
+		&i.CreatedAt,
 	)
 	return i, err
 }

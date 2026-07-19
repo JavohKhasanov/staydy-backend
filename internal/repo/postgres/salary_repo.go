@@ -135,12 +135,28 @@ func (r *SalaryRepository) ListSlips(ctx context.Context, orgID uuid.UUID, from,
 func (r *SalaryRepository) MarkPaid(ctx context.Context, orgID, id uuid.UUID) (entity.SalarySlip, error) {
 	var slip entity.SalarySlip
 	err := r.db.WithTenant(ctx, orgID.String(), func(tx pgx.Tx) error {
-		row, e := sqlc.New(tx).MarkSalarySlipPaid(ctx, id)
+		q := sqlc.New(tx)
+		row, e := q.MarkSalarySlipPaid(ctx, id) // no-op (ErrNoRows) if already paid
 		if e != nil {
 			return e
 		}
 		slip = mapSalarySlip(row)
-		return nil
+		// Paid salary is an operating expense: record it so Moliya's month expense/profit
+		// include payroll (category "maosh"; same tx, so a failed pay records nothing).
+		teacherName := ""
+		if u, uerr := q.GetUserByID(ctx, row.TeacherID); uerr == nil {
+			teacherName = u.FullName
+		}
+		now := time.Now()
+		note := "Maosh: " + teacherName + " (" + row.PeriodStart.Time.Format("2006-01") + ")"
+		_, e = q.CreateExpense(ctx, sqlc.CreateExpenseParams{
+			OrgID:    orgID,
+			Category: "maosh",
+			Amount:   row.Net,
+			SpentAt:  dateVal(&now),
+			Note:     note,
+		})
+		return e
 	})
 	if errors.Is(err, pgx.ErrNoRows) {
 		return entity.SalarySlip{}, repo.ErrNotFound

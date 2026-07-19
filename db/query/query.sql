@@ -435,7 +435,8 @@ WHERE ss.period_start >= $1 AND ss.period_end <= $2
 ORDER BY ss.created_at DESC;
 
 -- name: MarkSalarySlipPaid :one
-UPDATE salary_slips SET status = 'paid', paid_at = now() WHERE id = $1 RETURNING *;
+UPDATE salary_slips SET status = 'paid', paid_at = now()
+WHERE id = $1 AND status <> 'paid' RETURNING *;
 
 -- name: DeleteSalarySlip :exec
 DELETE FROM salary_slips WHERE id = $1;

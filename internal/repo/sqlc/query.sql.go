@@ -3318,7 +3318,8 @@ func (q *Queries) MarkLeadConverted(ctx context.Context, arg MarkLeadConvertedPa
 }
 
 const markSalarySlipPaid = `-- name: MarkSalarySlipPaid :one
-UPDATE salary_slips SET status = 'paid', paid_at = now() WHERE id = $1 RETURNING id, org_id, teacher_id, period_start, period_end, gross, bonus, deduction, net, status, note, paid_at, created_at
+UPDATE salary_slips SET status = 'paid', paid_at = now()
+WHERE id = $1 AND status <> 'paid' RETURNING id, org_id, teacher_id, period_start, period_end, gross, bonus, deduction, net, status, note, paid_at, created_at
 `
 
 func (q *Queries) MarkSalarySlipPaid(ctx context.Context, id uuid.UUID) (SalarySlip, error) {

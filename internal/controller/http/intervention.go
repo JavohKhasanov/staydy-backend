@@ -32,6 +32,10 @@ type resolveTaskRequest struct {
 
 type listTasksInput struct{}
 type listTasksOutput struct{ Body []taskResponse }
+type taskIDInput struct {
+	ID string `path:"id" format:"uuid"`
+}
+
 type resolveTaskInput struct {
 	ID   string `path:"id" format:"uuid"`
 	Body resolveTaskRequest
@@ -80,6 +84,29 @@ func registerInterventions(api huma.API, svc *interventionusecase.Service, log z
 			return nil, huma.Error422UnprocessableEntity("invalid task id")
 		}
 		task, err := svc.Resolve(ctx, p.OrgID, id, in.Body.ResolutionComment)
+		if err != nil {
+			return nil, mapInterventionError(LangFromContext(ctx), err, log)
+		}
+		return &taskOutput{Body: toTaskResponse(task)}, nil
+	})
+
+	Register(api, BearerOperation(huma.Operation{
+		OperationID: "intervention-tasks-start",
+		Method:      http.MethodPost,
+		Path:        "/intervention-tasks/{id}/start",
+		Summary:     "Move an open task to In Progress",
+		Tags:        []string{"intervention-tasks"},
+		Errors:      []int{http.StatusUnprocessableEntity, http.StatusNotFound, http.StatusInternalServerError},
+	}), func(ctx context.Context, in *taskIDInput) (*taskOutput, error) {
+		p, err := principal(ctx)
+		if err != nil {
+			return nil, err
+		}
+		id, err := uuid.Parse(in.ID)
+		if err != nil {
+			return nil, huma.Error422UnprocessableEntity("invalid task id")
+		}
+		task, err := svc.Start(ctx, p.OrgID, id)
 		if err != nil {
 			return nil, mapInterventionError(LangFromContext(ctx), err, log)
 		}

@@ -154,6 +154,7 @@ type Querier interface {
 	SetLeadStage(ctx context.Context, arg SetLeadStageParams) (Lead, error)
 	SetStudentTelegramChat(ctx context.Context, arg SetStudentTelegramChatParams) error
 	SlugExists(ctx context.Context, slug string) (bool, error)
+	StartInterventionTask(ctx context.Context, id uuid.UUID) (InterventionTask, error)
 	StudentBalance(ctx context.Context, studentID uuid.UUID) (int64, error)
 	TeacherRevenue(ctx context.Context, arg TeacherRevenueParams) (int64, error)
 	TopObstacles(ctx context.Context) ([]TopObstaclesRow, error)

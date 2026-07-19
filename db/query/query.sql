@@ -567,6 +567,12 @@ ORDER BY t.created_at DESC;
 -- name: GetInterventionTask :one
 SELECT * FROM intervention_tasks WHERE id = $1;
 
+-- name: StartInterventionTask :one
+UPDATE intervention_tasks
+SET status = 'In Progress'
+WHERE id = $1 AND status = 'Open'
+RETURNING *;
+
 -- name: ResolveInterventionTask :one
 UPDATE intervention_tasks
 SET status = 'Resolved', resolution_comment = $2, resolved_at = now()

@@ -30,6 +30,11 @@ func (s *Service) List(ctx context.Context, orgID uuid.UUID) ([]entity.Intervent
 }
 
 // Resolve closes an open task with a mentor's resolution note.
+// Start moves an open task to In Progress ("kim shug'ullanyapti" marker on the Kanban).
+func (s *Service) Start(ctx context.Context, orgID, id uuid.UUID) (entity.InterventionTask, error) {
+	return s.tasks.Start(ctx, orgID, id)
+}
+
 func (s *Service) Resolve(ctx context.Context, orgID, id uuid.UUID, comment string) (entity.InterventionTask, error) {
 	comment = strings.TrimSpace(comment)
 	if comment == "" {

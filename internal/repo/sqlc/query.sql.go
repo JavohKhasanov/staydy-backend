@@ -3512,6 +3512,29 @@ func (q *Queries) SlugExists(ctx context.Context, slug string) (bool, error) {
 	return exists, err
 }
 
+const startInterventionTask = `-- name: StartInterventionTask :one
+UPDATE intervention_tasks
+SET status = 'In Progress'
+WHERE id = $1 AND status = 'Open'
+RETURNING id, org_id, student_id, reasons, status, resolution_comment, created_at, resolved_at
+`
+
+func (q *Queries) StartInterventionTask(ctx context.Context, id uuid.UUID) (InterventionTask, error) {
+	row := q.db.QueryRow(ctx, startInterventionTask, id)
+	var i InterventionTask
+	err := row.Scan(
+		&i.ID,
+		&i.OrgID,
+		&i.StudentID,
+		&i.Reasons,
+		&i.Status,
+		&i.ResolutionComment,
+		&i.CreatedAt,
+		&i.ResolvedAt,
+	)
+	return i, err
+}
+
 const studentBalance = `-- name: StudentBalance :one
 SELECT COALESCE(SUM(amount - paid_amount), 0)::bigint AS balance
 FROM invoices WHERE student_id = $1 AND paid_amount < amount

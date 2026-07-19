@@ -211,6 +211,8 @@ type InterventionRepository interface {
 	CountOpenForStudent(ctx context.Context, orgID, studentID uuid.UUID) (int64, error)
 	List(ctx context.Context, orgID uuid.UUID) ([]entity.InterventionTask, error)
 	Resolve(ctx context.Context, orgID, id uuid.UUID, comment string) (entity.InterventionTask, error)
+	// Start moves an Open task to In Progress (ErrNotFound if missing or not Open).
+	Start(ctx context.Context, orgID, id uuid.UUID) (entity.InterventionTask, error)
 }
 
 // RiskOutcome is the persisted result of recomputing a student's risk inside the

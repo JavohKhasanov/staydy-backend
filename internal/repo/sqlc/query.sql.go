@@ -1523,6 +1523,15 @@ func (q *Queries) DeleteSalarySlip(ctx context.Context, id uuid.UUID) error {
 	return err
 }
 
+const deleteStudent = `-- name: DeleteStudent :exec
+DELETE FROM students WHERE id = $1
+`
+
+func (q *Queries) DeleteStudent(ctx context.Context, id uuid.UUID) error {
+	_, err := q.db.Exec(ctx, deleteStudent, id)
+	return err
+}
+
 const deleteTeacher = `-- name: DeleteTeacher :exec
 DELETE FROM users WHERE id = $1 AND role = 'teacher'
 `

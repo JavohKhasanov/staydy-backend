@@ -86,6 +86,7 @@ type Querier interface {
 	DeletePlan(ctx context.Context, id uuid.UUID) error
 	DeleteRoom(ctx context.Context, id uuid.UUID) error
 	DeleteSalarySlip(ctx context.Context, id uuid.UUID) error
+	DeleteStudent(ctx context.Context, id uuid.UUID) error
 	DeleteTeacher(ctx context.Context, id uuid.UUID) error
 	ExpensesByCategory(ctx context.Context, arg ExpensesByCategoryParams) ([]ExpensesByCategoryRow, error)
 	FinanceSummary(ctx context.Context, dollar_1 uuid.UUID) (FinanceSummaryRow, error)

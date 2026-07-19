@@ -117,6 +117,7 @@ type UpdateStudentParams struct {
 type StudentRepository interface {
 	Create(ctx context.Context, orgID uuid.UUID, p CreateStudentParams) (entity.Student, error)
 	Update(ctx context.Context, orgID, id uuid.UUID, p UpdateStudentParams) (entity.Student, error)
+	Delete(ctx context.Context, orgID, id uuid.UUID) error
 	List(ctx context.Context, orgID uuid.UUID) ([]entity.Student, error)
 	GetByID(ctx context.Context, orgID, id uuid.UUID) (entity.Student, error)
 	UpdateRisk(ctx context.Context, orgID, id uuid.UUID, score int, tier string) error

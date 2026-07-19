@@ -214,6 +214,11 @@ func (s *Service) List(ctx context.Context, orgID uuid.UUID) ([]entity.Student, 
 	return s.students.List(ctx, orgID)
 }
 
+// Delete removes a student and all their child records (attendance, notes, invoices, … cascade).
+func (s *Service) Delete(ctx context.Context, orgID, id uuid.UUID) error {
+	return s.students.Delete(ctx, orgID, id)
+}
+
 // Get returns a student with notes, survey/attendance history, and a fresh risk breakdown.
 // The returned score is recomputed alongside the factors so the two always agree.
 func (s *Service) Get(ctx context.Context, orgID, id uuid.UUID) (*Detail, error) {

@@ -340,6 +340,29 @@ func registerStudents(api huma.API, svc *studentusecase.Service, log zerolog.Log
 	})
 
 	Register(api, BearerOperation(huma.Operation{
+		OperationID:   "students-delete",
+		Method:        http.MethodDelete,
+		Path:          "/students/{id}",
+		Summary:       "Delete a student and all their records (cascade)",
+		Tags:          []string{"students"},
+		DefaultStatus: http.StatusNoContent,
+		Errors:        []int{http.StatusUnprocessableEntity, http.StatusInternalServerError},
+	}), func(ctx context.Context, in *studentIDInput) (*struct{}, error) {
+		p, err := principal(ctx)
+		if err != nil {
+			return nil, err
+		}
+		id, err := uuid.Parse(in.ID)
+		if err != nil {
+			return nil, huma.Error422UnprocessableEntity("invalid student id")
+		}
+		if err := svc.Delete(ctx, p.OrgID, id); err != nil {
+			return nil, mapStudentError(LangFromContext(ctx), err, log)
+		}
+		return nil, nil
+	})
+
+	Register(api, BearerOperation(huma.Operation{
 		OperationID: "students-get",
 		Method:      http.MethodGet,
 		Path:        "/students/{id}",

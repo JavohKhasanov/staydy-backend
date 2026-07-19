@@ -235,6 +235,9 @@ ORDER BY risk_score DESC, name ASC;
 -- name: GetStudent :one
 SELECT * FROM students WHERE id = $1;
 
+-- name: DeleteStudent :exec
+DELETE FROM students WHERE id = $1;
+
 -- name: UpdateStudentRisk :exec
 UPDATE students
 SET risk_score = $2, risk_tier = $3, updated_at = now()

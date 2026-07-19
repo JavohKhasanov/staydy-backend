@@ -167,6 +167,12 @@ func (r *StudentRepository) AddNote(ctx context.Context, orgID, studentID uuid.U
 
 // AssignGroup sets (or clears, when groupID is nil) a student's group. A group not in this
 // tenant trips the composite (org_id, group_id) FK → ErrNotFound.
+func (r *StudentRepository) Delete(ctx context.Context, orgID, id uuid.UUID) error {
+	return r.db.WithTenant(ctx, orgID.String(), func(tx pgx.Tx) error {
+		return sqlc.New(tx).DeleteStudent(ctx, id)
+	})
+}
+
 func (r *StudentRepository) AssignGroup(ctx context.Context, orgID, studentID uuid.UUID, groupID *uuid.UUID) error {
 	err := r.db.WithTenant(ctx, orgID.String(), func(tx pgx.Tx) error {
 		return sqlc.New(tx).AssignStudentGroup(ctx, sqlc.AssignStudentGroupParams{

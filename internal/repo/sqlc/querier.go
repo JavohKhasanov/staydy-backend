@@ -97,6 +97,7 @@ type Querier interface {
 	GetInviteToken(ctx context.Context, token string) (InviteToken, error)
 	GetInvoice(ctx context.Context, arg GetInvoiceParams) (Invoice, error)
 	GetLead(ctx context.Context, arg GetLeadParams) (Lead, error)
+	GetLessonByGroupDate(ctx context.Context, arg GetLessonByGroupDateParams) (Lesson, error)
 	GetOrganizationByID(ctx context.Context, id uuid.UUID) (Organization, error)
 	GetOrganizationBySlug(ctx context.Context, slug string) (Organization, error)
 	GetPayment(ctx context.Context, arg GetPaymentParams) (Payment, error)

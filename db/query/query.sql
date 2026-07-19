@@ -521,6 +521,12 @@ RETURNING *;
 -- name: DeleteLesson :exec
 DELETE FROM lessons WHERE org_id = $1 AND id = $2;
 
+-- name: GetLessonByGroupDate :one
+SELECT * FROM lessons
+WHERE group_id = @group_id::uuid AND date = @date::date
+ORDER BY created_at ASC
+LIMIT 1;
+
 -- name: CreateInterventionTask :one
 -- ON CONFLICT DO NOTHING (against the one-open-per-student partial index) makes this
 -- idempotent WITHOUT raising 23505, which would otherwise abort the surrounding tx.

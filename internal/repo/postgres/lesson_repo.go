@@ -44,6 +44,26 @@ func (r *LessonRepository) List(ctx context.Context, orgID uuid.UUID, from, to t
 	return out, err
 }
 
+// FindByGroupDate returns the (single) lesson/session record for a group on a date, if any.
+func (r *LessonRepository) FindByGroupDate(ctx context.Context, orgID, groupID uuid.UUID, date time.Time) (entity.Lesson, bool, error) {
+	var row sqlc.Lesson
+	err := r.db.WithTenant(ctx, orgID.String(), func(tx pgx.Tx) error {
+		var e error
+		row, e = sqlc.New(tx).GetLessonByGroupDate(ctx, sqlc.GetLessonByGroupDateParams{
+			GroupID: groupID,
+			Date:    dateVal(&date),
+		})
+		return e
+	})
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return entity.Lesson{}, false, nil
+		}
+		return entity.Lesson{}, false, err
+	}
+	return mapLesson(row), true, nil
+}
+
 func (r *LessonRepository) Create(ctx context.Context, orgID uuid.UUID, p repo.LessonParams) (entity.Lesson, error) {
 	var row sqlc.Lesson
 	err := r.db.WithTenant(ctx, orgID.String(), func(tx pgx.Tx) error {

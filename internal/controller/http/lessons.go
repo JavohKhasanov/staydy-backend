@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
+	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 
 	"github.com/student-success/backend/internal/entity"
@@ -55,6 +56,23 @@ type lessonIDInput struct {
 }
 type lessonOutput struct{ Body lessonResponse }
 type deleteLessonOutput struct{}
+
+// Session topic: "what was taught" for a group on a date, recorded at attendance time.
+type sessionTopicBody struct {
+	Topic string `json:"topic"`
+}
+type sessionTopicQuery struct {
+	GroupID string `query:"groupId" format:"uuid"`
+	Date    string `query:"date" doc:"YYYY-MM-DD"`
+}
+type sessionTopicOutput struct{ Body sessionTopicBody }
+
+type saveSessionBody struct {
+	GroupID string `json:"groupId" format:"uuid"`
+	Date    string `json:"date" format:"date" doc:"YYYY-MM-DD"`
+	Topic   string `json:"topic,omitempty" maxLength:"255"`
+}
+type saveSessionInput struct{ Body saveSessionBody }
 
 // registerLessons mounts the timetable. Mount on a group gated to center_admin.
 func registerLessons(api huma.API, svc *lessonusecase.Service, log zerolog.Logger) {
@@ -162,6 +180,59 @@ func registerLessons(api huma.API, svc *lessonusecase.Service, log zerolog.Logge
 			return nil, mapLessonError(LangFromContext(ctx), err, log)
 		}
 		return &deleteLessonOutput{}, nil
+	})
+
+	Register(api, BearerOperation(huma.Operation{
+		OperationID: "lessons-session-get",
+		Method:      http.MethodGet,
+		Path:        "/lessons/session",
+		Summary:     "Get the recorded topic for a group's session on a date",
+		Tags:        []string{"lessons"},
+		Errors:      []int{http.StatusUnprocessableEntity, http.StatusForbidden, http.StatusInternalServerError},
+	}), func(ctx context.Context, in *sessionTopicQuery) (*sessionTopicOutput, error) {
+		p, err := principal(ctx)
+		if err != nil {
+			return nil, err
+		}
+		gid, gerr := uuid.Parse(in.GroupID)
+		if gerr != nil {
+			return nil, huma.Error422UnprocessableEntity("invalid groupId")
+		}
+		date, derr := time.Parse("2006-01-02", in.Date)
+		if derr != nil {
+			return nil, huma.Error422UnprocessableEntity("date must be YYYY-MM-DD")
+		}
+		topic, err := svc.SessionTopic(ctx, p.OrgID, gid, date)
+		if err != nil {
+			return nil, mapLessonError(LangFromContext(ctx), err, log)
+		}
+		return &sessionTopicOutput{Body: sessionTopicBody{Topic: topic}}, nil
+	})
+
+	Register(api, BearerOperation(huma.Operation{
+		OperationID: "lessons-session-save",
+		Method:      http.MethodPost,
+		Path:        "/lessons/session",
+		Summary:     "Record what was taught for a group's session on a date (upsert)",
+		Tags:        []string{"lessons"},
+		Errors:      []int{http.StatusUnprocessableEntity, http.StatusForbidden, http.StatusInternalServerError},
+	}), func(ctx context.Context, in *saveSessionInput) (*sessionTopicOutput, error) {
+		p, err := principal(ctx)
+		if err != nil {
+			return nil, err
+		}
+		gid, gerr := uuid.Parse(in.Body.GroupID)
+		if gerr != nil {
+			return nil, huma.Error422UnprocessableEntity("invalid groupId")
+		}
+		date, derr := time.Parse("2006-01-02", in.Body.Date)
+		if derr != nil {
+			return nil, huma.Error422UnprocessableEntity("date must be YYYY-MM-DD")
+		}
+		if err := svc.SaveSessionTopic(ctx, p.OrgID, gid, date, in.Body.Topic); err != nil {
+			return nil, mapLessonError(LangFromContext(ctx), err, log)
+		}
+		return &sessionTopicOutput{Body: sessionTopicBody{Topic: in.Body.Topic}}, nil
 	})
 }
 

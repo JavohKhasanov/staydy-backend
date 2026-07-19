@@ -488,6 +488,8 @@ type LessonRepository interface {
 	Create(ctx context.Context, orgID uuid.UUID, p LessonParams) (entity.Lesson, error)
 	Update(ctx context.Context, orgID, id uuid.UUID, p LessonParams) (entity.Lesson, error)
 	Delete(ctx context.Context, orgID, id uuid.UUID) error
+	// FindByGroupDate returns the session record for a group on a date (found=false if none).
+	FindByGroupDate(ctx context.Context, orgID, groupID uuid.UUID, date time.Time) (entity.Lesson, bool, error)
 	// CountRoomConflicts counts other lessons booking roomID at an overlapping time on date
 	// (excludeID = self on update, or uuid.Nil).
 	CountRoomConflicts(ctx context.Context, orgID, roomID uuid.UUID, date time.Time, start, end string, excludeID uuid.UUID) (int64, error)

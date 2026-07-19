@@ -84,6 +84,50 @@ func (s *Service) Delete(ctx context.Context, orgID, id uuid.UUID) error {
 	return s.repo.Delete(ctx, orgID, id)
 }
 
+// SessionTopic returns the recorded topic for a group's session on a date (empty if none).
+func (s *Service) SessionTopic(ctx context.Context, orgID, groupID uuid.UUID, date time.Time) (string, error) {
+	l, found, err := s.repo.FindByGroupDate(ctx, orgID, groupID, date)
+	if err != nil || !found {
+		return "", err
+	}
+	return l.Topic, nil
+}
+
+// SaveSessionTopic records "what was taught" for a group on a date. It upserts a single lesson
+// row per (group, date): updating the existing one or creating a new done session. Called when a
+// teacher takes attendance and notes the topic.
+func (s *Service) SaveSessionTopic(ctx context.Context, orgID, groupID uuid.UUID, date time.Time, topic string) error {
+	if date.IsZero() {
+		return ErrValidation
+	}
+	topic = strings.TrimSpace(topic)
+	existing, found, err := s.repo.FindByGroupDate(ctx, orgID, groupID, date)
+	if err != nil {
+		return err
+	}
+	if found {
+		_, uerr := s.repo.Update(ctx, orgID, existing.ID, repo.LessonParams{
+			GroupID:   &groupID,
+			TeacherID: existing.TeacherID,
+			Date:      date,
+			StartTime: existing.StartTime,
+			EndTime:   existing.EndTime,
+			Room:      existing.Room,
+			RoomID:    existing.RoomID,
+			Topic:     topic,
+			Status:    "done",
+		})
+		return uerr
+	}
+	_, cerr := s.repo.Create(ctx, orgID, repo.LessonParams{
+		GroupID: &groupID,
+		Date:    date,
+		Topic:   topic,
+		Status:  "done",
+	})
+	return cerr
+}
+
 func (s *Service) normalize(in Input) (repo.LessonParams, error) {
 	if in.Date.IsZero() {
 		return repo.LessonParams{}, ErrValidation

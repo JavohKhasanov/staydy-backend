@@ -1790,6 +1790,38 @@ func (q *Queries) GetLead(ctx context.Context, arg GetLeadParams) (Lead, error) 
 	return i, err
 }
 
+const getLessonByGroupDate = `-- name: GetLessonByGroupDate :one
+SELECT id, org_id, group_id, teacher_id, date, start_time, end_time, room, room_id, topic, status, created_at FROM lessons
+WHERE group_id = $1::uuid AND date = $2::date
+ORDER BY created_at ASC
+LIMIT 1
+`
+
+type GetLessonByGroupDateParams struct {
+	GroupID uuid.UUID   `json:"group_id"`
+	Date    pgtype.Date `json:"date"`
+}
+
+func (q *Queries) GetLessonByGroupDate(ctx context.Context, arg GetLessonByGroupDateParams) (Lesson, error) {
+	row := q.db.QueryRow(ctx, getLessonByGroupDate, arg.GroupID, arg.Date)
+	var i Lesson
+	err := row.Scan(
+		&i.ID,
+		&i.OrgID,
+		&i.GroupID,
+		&i.TeacherID,
+		&i.Date,
+		&i.StartTime,
+		&i.EndTime,
+		&i.Room,
+		&i.RoomID,
+		&i.Topic,
+		&i.Status,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const getOrganizationByID = `-- name: GetOrganizationByID :one
 SELECT id, name, slug, plan, status, trial_ends_at, billing_status, created_at, updated_at FROM organizations WHERE id = $1
 `

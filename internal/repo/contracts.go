@@ -392,6 +392,8 @@ type FinanceRepository interface {
 	DeletePayment(ctx context.Context, orgID, id uuid.UUID) error
 	Summary(ctx context.Context, orgID uuid.UUID) (entity.FinanceSummary, error)
 	ListDebtors(ctx context.Context, orgID uuid.UUID) ([]entity.Debtor, error)
+	// GroupFinance returns each group member's invoiced/paid totals for a period ("2026-07").
+	GroupFinance(ctx context.Context, orgID, groupID uuid.UUID, period string) ([]entity.GroupFinanceRow, error)
 	CreateExpense(ctx context.Context, orgID uuid.UUID, p CreateExpenseParams) (entity.Expense, error)
 	ListExpenses(ctx context.Context, orgID uuid.UUID, from, to time.Time) ([]entity.Expense, error)
 	DeleteExpense(ctx context.Context, orgID, id uuid.UUID) error

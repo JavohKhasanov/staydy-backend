@@ -116,6 +116,11 @@ func (s *Service) Summary(ctx context.Context, orgID uuid.UUID) (entity.FinanceS
 	return s.repo.Summary(ctx, orgID)
 }
 
+// GroupFinance is the group roster's billing state for a month ("2026-07").
+func (s *Service) GroupFinance(ctx context.Context, orgID, groupID uuid.UUID, period string) ([]entity.GroupFinanceRow, error) {
+	return s.repo.GroupFinance(ctx, orgID, groupID, period)
+}
+
 func (s *Service) Debtors(ctx context.Context, orgID uuid.UUID) ([]entity.Debtor, error) {
 	return s.repo.ListDebtors(ctx, orgID)
 }

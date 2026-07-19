@@ -461,6 +461,16 @@ WHERE i.org_id = $1
 GROUP BY s.id, s.name
 ORDER BY balance DESC;
 
+-- name: GroupFinanceByPeriod :many
+SELECT s.id AS student_id, s.name AS student_name,
+       COALESCE(SUM(i.amount), 0)::bigint  AS invoiced,
+       COALESCE(SUM(i.paid_amount), 0)::bigint AS paid
+FROM students s
+LEFT JOIN invoices i ON i.student_id = s.id AND i.period = @period::text
+WHERE s.group_id = @group_id::uuid
+GROUP BY s.id, s.name
+ORDER BY s.name ASC;
+
 -- name: ListLeads :many
 SELECT * FROM leads WHERE org_id = $1 ORDER BY created_at DESC;
 

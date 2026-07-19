@@ -95,3 +95,11 @@ type Debtor struct {
 	Name      string
 	Balance   int64
 }
+
+// GroupFinanceRow is one student's billing state for a period (month) inside a group roster.
+type GroupFinanceRow struct {
+	StudentID uuid.UUID
+	Name      string
+	Invoiced  int64
+	Paid      int64
+}

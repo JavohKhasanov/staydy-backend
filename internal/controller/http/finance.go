@@ -4,9 +4,11 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
+	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 
 	"github.com/student-success/backend/internal/entity"
@@ -126,6 +128,22 @@ type debtorsOutput struct {
 		Balance   int64  `json:"balance"`
 	}
 }
+
+type groupFinanceRow struct {
+	StudentID string `json:"studentId"`
+	Name      string `json:"name"`
+	Invoiced  int64  `json:"invoiced"`
+	Paid      int64  `json:"paid"`
+}
+type groupFinanceBody struct {
+	Period   string            `json:"period"`
+	Students []groupFinanceRow `json:"students"`
+}
+type groupFinanceInput struct {
+	ID    string `path:"id" format:"uuid"`
+	Month string `query:"month" doc:"YYYY-MM (default: current month)"`
+}
+type groupFinanceOutput struct{ Body groupFinanceBody }
 
 // registerFinance mounts the manual money ledger. Mount on a group gated to center_admin.
 func registerFinance(api huma.API, svc *financeusecase.Service, log zerolog.Logger) {
@@ -346,6 +364,44 @@ func registerFinance(api huma.API, svc *financeusecase.Service, log zerolog.Logg
 				Name      string `json:"name"`
 				Balance   int64  `json:"balance"`
 			}{StudentID: d.StudentID.String(), Name: d.Name, Balance: d.Balance})
+		}
+		return out, nil
+	})
+
+	Register(api, BearerOperation(huma.Operation{
+		OperationID: "group-finance",
+		Method:      http.MethodGet,
+		Path:        "/groups/{id}/finance",
+		Summary:     "Group roster billing state for a month (invoiced/paid per student)",
+		Tags:        []string{"finance"},
+		Errors:      []int{http.StatusUnprocessableEntity, http.StatusForbidden, http.StatusInternalServerError},
+	}), func(ctx context.Context, in *groupFinanceInput) (*groupFinanceOutput, error) {
+		p, err := principal(ctx)
+		if err != nil {
+			return nil, err
+		}
+		gid, gerr := uuid.Parse(in.ID)
+		if gerr != nil {
+			return nil, huma.Error422UnprocessableEntity("invalid group id")
+		}
+		period := strings.TrimSpace(in.Month)
+		if period == "" {
+			period = time.Now().Format("2006-01")
+		}
+		rows, err := svc.GroupFinance(ctx, p.OrgID, gid, period)
+		if err != nil {
+			return nil, mapFinanceError(LangFromContext(ctx), err, log)
+		}
+		out := &groupFinanceOutput{}
+		out.Body.Period = period
+		out.Body.Students = make([]groupFinanceRow, 0, len(rows))
+		for _, r := range rows {
+			out.Body.Students = append(out.Body.Students, groupFinanceRow{
+				StudentID: r.StudentID.String(),
+				Name:      r.Name,
+				Invoiced:  r.Invoiced,
+				Paid:      r.Paid,
+			})
 		}
 		return out, nil
 	})

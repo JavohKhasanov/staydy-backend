@@ -106,6 +106,7 @@ type Querier interface {
 	GetStudent(ctx context.Context, id uuid.UUID) (Student, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	GetUserByID(ctx context.Context, id uuid.UUID) (User, error)
+	GroupFinanceByPeriod(ctx context.Context, arg GroupFinanceByPeriodParams) ([]GroupFinanceByPeriodRow, error)
 	HighRiskStudents(ctx context.Context) ([]Student, error)
 	ListActivePlans(ctx context.Context) ([]Plan, error)
 	ListActivities(ctx context.Context, arg ListActivitiesParams) ([]Activity, error)

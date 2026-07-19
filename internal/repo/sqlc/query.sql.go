@@ -2018,6 +2018,54 @@ func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (User, error) {
 	return i, err
 }
 
+const groupFinanceByPeriod = `-- name: GroupFinanceByPeriod :many
+SELECT s.id AS student_id, s.name AS student_name,
+       COALESCE(SUM(i.amount), 0)::bigint  AS invoiced,
+       COALESCE(SUM(i.paid_amount), 0)::bigint AS paid
+FROM students s
+LEFT JOIN invoices i ON i.student_id = s.id AND i.period = $1::text
+WHERE s.group_id = $2::uuid
+GROUP BY s.id, s.name
+ORDER BY s.name ASC
+`
+
+type GroupFinanceByPeriodParams struct {
+	Period  string    `json:"period"`
+	GroupID uuid.UUID `json:"group_id"`
+}
+
+type GroupFinanceByPeriodRow struct {
+	StudentID   uuid.UUID `json:"student_id"`
+	StudentName string    `json:"student_name"`
+	Invoiced    int64     `json:"invoiced"`
+	Paid        int64     `json:"paid"`
+}
+
+func (q *Queries) GroupFinanceByPeriod(ctx context.Context, arg GroupFinanceByPeriodParams) ([]GroupFinanceByPeriodRow, error) {
+	rows, err := q.db.Query(ctx, groupFinanceByPeriod, arg.Period, arg.GroupID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GroupFinanceByPeriodRow{}
+	for rows.Next() {
+		var i GroupFinanceByPeriodRow
+		if err := rows.Scan(
+			&i.StudentID,
+			&i.StudentName,
+			&i.Invoiced,
+			&i.Paid,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const highRiskStudents = `-- name: HighRiskStudents :many
 SELECT id, org_id, name, phone, telegram_id, telegram_chat_id, course_name, group_name, group_id, mentor_name, start_date, onboarding_goal, six_month_target, weekly_study_hours, confidence_level, risk_score, risk_tier, email, birth_date, gender, second_phone, address, parent_name, parent_phone, student_code, status, mentor_id, branch_id, created_at, updated_at FROM students
 WHERE risk_tier IN ('Red', 'Yellow')

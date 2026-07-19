@@ -264,6 +264,30 @@ func (r *FinanceRepository) ListDebtors(ctx context.Context, orgID uuid.UUID) ([
 	return out, err
 }
 
+func (r *FinanceRepository) GroupFinance(ctx context.Context, orgID, groupID uuid.UUID, period string) ([]entity.GroupFinanceRow, error) {
+	var out []entity.GroupFinanceRow
+	err := r.db.WithTenant(ctx, orgID.String(), func(tx pgx.Tx) error {
+		rows, e := sqlc.New(tx).GroupFinanceByPeriod(ctx, sqlc.GroupFinanceByPeriodParams{
+			Period:  period,
+			GroupID: groupID,
+		})
+		if e != nil {
+			return e
+		}
+		out = make([]entity.GroupFinanceRow, 0, len(rows))
+		for _, row := range rows {
+			out = append(out, entity.GroupFinanceRow{
+				StudentID: row.StudentID,
+				Name:      row.StudentName,
+				Invoiced:  row.Invoiced,
+				Paid:      row.Paid,
+			})
+		}
+		return nil
+	})
+	return out, err
+}
+
 func mapInvoice(i sqlc.Invoice) entity.Invoice {
 	return entity.Invoice{
 		ID:           i.ID,

@@ -86,6 +86,7 @@ type Querier interface {
 	DeletePlan(ctx context.Context, id uuid.UUID) error
 	DeleteRoom(ctx context.Context, id uuid.UUID) error
 	DeleteSalarySlip(ctx context.Context, id uuid.UUID) error
+	DeleteTeacher(ctx context.Context, id uuid.UUID) error
 	ExpensesByCategory(ctx context.Context, arg ExpensesByCategoryParams) ([]ExpensesByCategoryRow, error)
 	FinanceSummary(ctx context.Context, dollar_1 uuid.UUID) (FinanceSummaryRow, error)
 	GetBotConversation(ctx context.Context, telegramChatID int64) (BotConversation, error)
@@ -171,6 +172,8 @@ type Querier interface {
 	// group are updated by their own queries; this leaves them untouched.
 	UpdateStudent(ctx context.Context, arg UpdateStudentParams) (Student, error)
 	UpdateStudentRisk(ctx context.Context, arg UpdateStudentRiskParams) error
+	UpdateTeacher(ctx context.Context, arg UpdateTeacherParams) (User, error)
+	UpdateUserPassword(ctx context.Context, arg UpdateUserPasswordParams) error
 	UpdateUserProfile(ctx context.Context, arg UpdateUserProfileParams) (User, error)
 	UpsertSalaryRule(ctx context.Context, arg UpsertSalaryRuleParams) (SalaryRule, error)
 }

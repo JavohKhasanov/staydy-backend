@@ -50,3 +50,33 @@ func (s *Service) List(ctx context.Context, orgID uuid.UUID) ([]entity.User, err
 func (s *Service) Get(ctx context.Context, orgID, id uuid.UUID) (entity.User, error) {
 	return s.teachers.GetByID(ctx, orgID, id)
 }
+
+type UpdateInput struct {
+	Email    string
+	FullName string
+}
+
+func (s *Service) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInput) (entity.User, error) {
+	email := strings.ToLower(strings.TrimSpace(in.Email))
+	fullName := strings.TrimSpace(in.FullName)
+	if !strings.Contains(email, "@") || len(email) < 3 || fullName == "" {
+		return entity.User{}, ErrValidation
+	}
+	return s.teachers.Update(ctx, orgID, id, email, fullName)
+}
+
+// SetPassword lets a center_admin reset a teacher's login password.
+func (s *Service) SetPassword(ctx context.Context, orgID, id uuid.UUID, password string) error {
+	if len(password) < 8 {
+		return ErrValidation
+	}
+	hash, err := security.HashPassword(password)
+	if err != nil {
+		return err
+	}
+	return s.teachers.SetPassword(ctx, orgID, id, hash)
+}
+
+func (s *Service) Delete(ctx context.Context, orgID, id uuid.UUID) error {
+	return s.teachers.Delete(ctx, orgID, id)
+}

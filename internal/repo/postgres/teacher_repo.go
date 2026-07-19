@@ -75,3 +75,34 @@ func (r *TeacherRepository) GetByID(ctx context.Context, orgID, id uuid.UUID) (e
 	}
 	return mapUser(row), nil
 }
+
+func (r *TeacherRepository) Update(ctx context.Context, orgID, id uuid.UUID, email, fullName string) (entity.User, error) {
+	var row sqlc.User
+	err := r.db.WithTenant(ctx, orgID.String(), func(tx pgx.Tx) error {
+		var e error
+		row, e = sqlc.New(tx).UpdateTeacher(ctx, sqlc.UpdateTeacherParams{ID: id, FullName: fullName, Email: email})
+		return e
+	})
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return entity.User{}, repo.ErrNotFound
+		}
+		if isUniqueViolation(err) {
+			return entity.User{}, repo.ErrAlreadyExists // email taken by another account
+		}
+		return entity.User{}, err
+	}
+	return mapUser(row), nil
+}
+
+func (r *TeacherRepository) SetPassword(ctx context.Context, orgID, id uuid.UUID, passwordHash string) error {
+	return r.db.WithTenant(ctx, orgID.String(), func(tx pgx.Tx) error {
+		return sqlc.New(tx).UpdateUserPassword(ctx, sqlc.UpdateUserPasswordParams{ID: id, PasswordHash: passwordHash})
+	})
+}
+
+func (r *TeacherRepository) Delete(ctx context.Context, orgID, id uuid.UUID) error {
+	return r.db.WithTenant(ctx, orgID.String(), func(tx pgx.Tx) error {
+		return sqlc.New(tx).DeleteTeacher(ctx, id)
+	})
+}

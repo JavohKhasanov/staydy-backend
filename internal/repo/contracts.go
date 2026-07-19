@@ -164,6 +164,9 @@ type TeacherRepository interface {
 	Create(ctx context.Context, orgID uuid.UUID, email, passwordHash, fullName string) (entity.User, error)
 	List(ctx context.Context, orgID uuid.UUID) ([]entity.User, error)
 	GetByID(ctx context.Context, orgID, id uuid.UUID) (entity.User, error)
+	Update(ctx context.Context, orgID, id uuid.UUID, email, fullName string) (entity.User, error)
+	SetPassword(ctx context.Context, orgID, id uuid.UUID, passwordHash string) error
+	Delete(ctx context.Context, orgID, id uuid.UUID) error
 }
 
 // CreateSurveyParams persists a weekly check-in (org_id supplied separately, from the JWT).

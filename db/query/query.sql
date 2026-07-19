@@ -127,6 +127,16 @@ SELECT * FROM users WHERE role = $1 ORDER BY full_name ASC;
 -- name: UpdateUserProfile :one
 UPDATE users SET full_name = $2, updated_at = now() WHERE id = $1 RETURNING *;
 
+-- name: UpdateTeacher :one
+UPDATE users SET full_name = $2, email = $3, updated_at = now()
+WHERE id = $1 AND role = 'teacher' RETURNING *;
+
+-- name: UpdateUserPassword :exec
+UPDATE users SET password_hash = $2, updated_at = now() WHERE id = $1;
+
+-- name: DeleteTeacher :exec
+DELETE FROM users WHERE id = $1 AND role = 'teacher';
+
 -- name: CreateRefreshSession :one
 INSERT INTO refresh_sessions (user_id, org_id, token_hash, user_agent, ip, expires_at)
 VALUES ($1, $2, $3, $4, $5, $6)

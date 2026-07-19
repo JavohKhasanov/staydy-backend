@@ -1523,6 +1523,15 @@ func (q *Queries) DeleteSalarySlip(ctx context.Context, id uuid.UUID) error {
 	return err
 }
 
+const deleteTeacher = `-- name: DeleteTeacher :exec
+DELETE FROM users WHERE id = $1 AND role = 'teacher'
+`
+
+func (q *Queries) DeleteTeacher(ctx context.Context, id uuid.UUID) error {
+	_, err := q.db.Exec(ctx, deleteTeacher, id)
+	return err
+}
+
 const expensesByCategory = `-- name: ExpensesByCategory :many
 SELECT category, COALESCE(SUM(amount), 0)::bigint AS total
 FROM expenses
@@ -4039,6 +4048,50 @@ type UpdateStudentRiskParams struct {
 
 func (q *Queries) UpdateStudentRisk(ctx context.Context, arg UpdateStudentRiskParams) error {
 	_, err := q.db.Exec(ctx, updateStudentRisk, arg.ID, arg.RiskScore, arg.RiskTier)
+	return err
+}
+
+const updateTeacher = `-- name: UpdateTeacher :one
+UPDATE users SET full_name = $2, email = $3, updated_at = now()
+WHERE id = $1 AND role = 'teacher' RETURNING id, org_id, email, password_hash, full_name, role, phone, is_active, branch_id, created_at, updated_at
+`
+
+type UpdateTeacherParams struct {
+	ID       uuid.UUID `json:"id"`
+	FullName string    `json:"full_name"`
+	Email    string    `json:"email"`
+}
+
+func (q *Queries) UpdateTeacher(ctx context.Context, arg UpdateTeacherParams) (User, error) {
+	row := q.db.QueryRow(ctx, updateTeacher, arg.ID, arg.FullName, arg.Email)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.OrgID,
+		&i.Email,
+		&i.PasswordHash,
+		&i.FullName,
+		&i.Role,
+		&i.Phone,
+		&i.IsActive,
+		&i.BranchID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const updateUserPassword = `-- name: UpdateUserPassword :exec
+UPDATE users SET password_hash = $2, updated_at = now() WHERE id = $1
+`
+
+type UpdateUserPasswordParams struct {
+	ID           uuid.UUID `json:"id"`
+	PasswordHash string    `json:"password_hash"`
+}
+
+func (q *Queries) UpdateUserPassword(ctx context.Context, arg UpdateUserPasswordParams) error {
+	_, err := q.db.Exec(ctx, updateUserPassword, arg.ID, arg.PasswordHash)
 	return err
 }
 

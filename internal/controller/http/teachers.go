@@ -30,9 +30,25 @@ type createTeacherRequest struct {
 	FullName string `json:"fullName" minLength:"1" maxLength:"255" example:"Ali Valiyev"`
 }
 
+type updateTeacherRequest struct {
+	Email    string `json:"email" format:"email" maxLength:"255"`
+	FullName string `json:"fullName" minLength:"1" maxLength:"255"`
+}
+type setTeacherPasswordRequest struct {
+	Password string `json:"password" minLength:"8" maxLength:"128"`
+}
+
 type listTeachersInput struct{}
 type listTeachersOutput struct{ Body []teacherResponse }
 type createTeacherInput struct{ Body createTeacherRequest }
+type updateTeacherInput struct {
+	ID   string `path:"id" format:"uuid"`
+	Body updateTeacherRequest
+}
+type setTeacherPasswordInput struct {
+	ID   string `path:"id" format:"uuid"`
+	Body setTeacherPasswordRequest
+}
 type teacherIDInput struct {
 	ID string `path:"id" format:"uuid"`
 }
@@ -108,6 +124,74 @@ func registerTeachers(api huma.API, svc *teacherusecase.Service, log zerolog.Log
 			return nil, mapTeacherError(LangFromContext(ctx), err, log)
 		}
 		return &teacherOutput{Body: toTeacherResponse(t)}, nil
+	})
+
+	Register(api, BearerOperation(huma.Operation{
+		OperationID: "teachers-update",
+		Method:      http.MethodPut,
+		Path:        "/teachers/{id}",
+		Summary:     "Update a teacher account (name, email)",
+		Tags:        []string{"teachers"},
+		Errors:      []int{http.StatusUnprocessableEntity, http.StatusConflict, http.StatusNotFound, http.StatusForbidden, http.StatusInternalServerError},
+	}), func(ctx context.Context, in *updateTeacherInput) (*teacherOutput, error) {
+		p, err := principal(ctx)
+		if err != nil {
+			return nil, err
+		}
+		id, perr := uuid.Parse(in.ID)
+		if perr != nil {
+			return nil, huma.Error422UnprocessableEntity("invalid teacher id")
+		}
+		t, err := svc.Update(ctx, p.OrgID, id, teacherusecase.UpdateInput{Email: in.Body.Email, FullName: in.Body.FullName})
+		if err != nil {
+			return nil, mapTeacherError(LangFromContext(ctx), err, log)
+		}
+		return &teacherOutput{Body: toTeacherResponse(t)}, nil
+	})
+
+	Register(api, BearerOperation(huma.Operation{
+		OperationID: "teachers-set-password",
+		Method:      http.MethodPut,
+		Path:        "/teachers/{id}/password",
+		Summary:     "Reset a teacher's login password (center_admin)",
+		Tags:        []string{"teachers"},
+		Errors:      []int{http.StatusUnprocessableEntity, http.StatusNotFound, http.StatusForbidden, http.StatusInternalServerError},
+	}), func(ctx context.Context, in *setTeacherPasswordInput) (*struct{}, error) {
+		p, err := principal(ctx)
+		if err != nil {
+			return nil, err
+		}
+		id, perr := uuid.Parse(in.ID)
+		if perr != nil {
+			return nil, huma.Error422UnprocessableEntity("invalid teacher id")
+		}
+		if err := svc.SetPassword(ctx, p.OrgID, id, in.Body.Password); err != nil {
+			return nil, mapTeacherError(LangFromContext(ctx), err, log)
+		}
+		return nil, nil
+	})
+
+	Register(api, BearerOperation(huma.Operation{
+		OperationID:   "teachers-delete",
+		Method:        http.MethodDelete,
+		Path:          "/teachers/{id}",
+		Summary:       "Delete a teacher account",
+		Tags:          []string{"teachers"},
+		DefaultStatus: http.StatusNoContent,
+		Errors:        []int{http.StatusUnprocessableEntity, http.StatusForbidden, http.StatusInternalServerError},
+	}), func(ctx context.Context, in *teacherIDInput) (*struct{}, error) {
+		p, err := principal(ctx)
+		if err != nil {
+			return nil, err
+		}
+		id, perr := uuid.Parse(in.ID)
+		if perr != nil {
+			return nil, huma.Error422UnprocessableEntity("invalid teacher id")
+		}
+		if err := svc.Delete(ctx, p.OrgID, id); err != nil {
+			return nil, mapTeacherError(LangFromContext(ctx), err, log)
+		}
+		return nil, nil
 	})
 }
 

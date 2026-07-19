@@ -26,6 +26,9 @@ type groupResponse struct {
 	Direction    string `json:"direction,omitempty"`
 	ScheduleDays string `json:"scheduleDays,omitempty"`
 	Capacity     int    `json:"capacity"`
+	StartTime    string `json:"startTime,omitempty"`
+	EndTime      string `json:"endTime,omitempty"`
+	RoomID       string `json:"roomId,omitempty"`
 	CreatedAt    string `json:"createdAt"`
 }
 
@@ -35,8 +38,11 @@ type groupRequest struct {
 	CourseID     string `json:"courseId,omitempty" format:"uuid" doc:"Course this group runs; omit to leave unset"`
 	BranchID     string `json:"branchId,omitempty" format:"uuid" doc:"Branch this group runs at; omit to leave org-wide"`
 	Direction    string `json:"direction,omitempty" maxLength:"255"`
-	ScheduleDays string `json:"scheduleDays,omitempty" maxLength:"255" doc:"e.g. 'Mon, Wed, Fri'"`
+	ScheduleDays string `json:"scheduleDays,omitempty" maxLength:"255" doc:"weekday codes, e.g. 'mon,wed,fri'"`
 	Capacity     int    `json:"capacity,omitempty" minimum:"0"`
+	StartTime    string `json:"startTime,omitempty" maxLength:"5" doc:"class start time HH:MM"`
+	EndTime      string `json:"endTime,omitempty" maxLength:"5" doc:"class end time HH:MM"`
+	RoomID       string `json:"roomId,omitempty" format:"uuid" doc:"room this group meets in; omit to leave unset"`
 }
 
 type assignGroupRequest struct {
@@ -111,6 +117,10 @@ func registerGroups(api huma.API, svc *groupusecase.Service, log zerolog.Logger)
 		if brerr != nil {
 			return nil, huma.Error422UnprocessableEntity("invalid branchId")
 		}
+		roomID, rmerr := parseOptionalUUID(in.Body.RoomID)
+		if rmerr != nil {
+			return nil, huma.Error422UnprocessableEntity("invalid roomId")
+		}
 		g, err := svc.Create(ctx, p.OrgID, groupusecase.CreateInput{
 			Name:         in.Body.Name,
 			TeacherID:    teacherID,
@@ -119,6 +129,9 @@ func registerGroups(api huma.API, svc *groupusecase.Service, log zerolog.Logger)
 			Direction:    in.Body.Direction,
 			ScheduleDays: in.Body.ScheduleDays,
 			Capacity:     in.Body.Capacity,
+			StartTime:    in.Body.StartTime,
+			EndTime:      in.Body.EndTime,
+			RoomID:       roomID,
 		})
 		if err != nil {
 			return nil, mapGroupError(LangFromContext(ctx), err, log)
@@ -177,6 +190,10 @@ func registerGroups(api huma.API, svc *groupusecase.Service, log zerolog.Logger)
 		if brerr != nil {
 			return nil, huma.Error422UnprocessableEntity("invalid branchId")
 		}
+		roomID, rmerr := parseOptionalUUID(in.Body.RoomID)
+		if rmerr != nil {
+			return nil, huma.Error422UnprocessableEntity("invalid roomId")
+		}
 		g, err := svc.Update(ctx, p.OrgID, id, groupusecase.UpdateInput{
 			Name:         in.Body.Name,
 			TeacherID:    teacherID,
@@ -185,6 +202,9 @@ func registerGroups(api huma.API, svc *groupusecase.Service, log zerolog.Logger)
 			Direction:    in.Body.Direction,
 			ScheduleDays: in.Body.ScheduleDays,
 			Capacity:     in.Body.Capacity,
+			StartTime:    in.Body.StartTime,
+			EndTime:      in.Body.EndTime,
+			RoomID:       roomID,
 		})
 		if err != nil {
 			return nil, mapGroupError(LangFromContext(ctx), err, log)
@@ -275,7 +295,12 @@ func toGroupResponse(g entity.Group) groupResponse {
 		Direction:    g.Direction,
 		ScheduleDays: g.ScheduleDays,
 		Capacity:     g.Capacity,
+		StartTime:    g.StartTime,
+		EndTime:      g.EndTime,
 		CreatedAt:    g.CreatedAt.UTC().Format(time.RFC3339),
+	}
+	if g.RoomID != nil {
+		r.RoomID = g.RoomID.String()
 	}
 	if g.TeacherID != nil {
 		r.TeacherID = g.TeacherID.String()

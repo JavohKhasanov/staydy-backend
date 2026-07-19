@@ -34,6 +34,9 @@ func (r *GroupRepository) Create(ctx context.Context, orgID uuid.UUID, p repo.Cr
 			Direction:    textVal(p.Direction),
 			ScheduleDays: textVal(p.ScheduleDays),
 			Capacity:     int32(p.Capacity),
+			StartTime:    p.StartTime,
+			EndTime:      p.EndTime,
+			RoomID:       nullableUUID(p.RoomID),
 		})
 		return e
 	})
@@ -109,6 +112,9 @@ func (r *GroupRepository) Update(ctx context.Context, orgID, id uuid.UUID, p rep
 			Direction:    textVal(p.Direction),
 			ScheduleDays: textVal(p.ScheduleDays),
 			Capacity:     int32(p.Capacity),
+			StartTime:    p.StartTime,
+			EndTime:      p.EndTime,
+			RoomID:       nullableUUID(p.RoomID),
 		})
 		return e
 	})

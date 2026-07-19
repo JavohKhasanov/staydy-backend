@@ -505,9 +505,9 @@ func (q *Queries) CreateExpense(ctx context.Context, arg CreateExpenseParams) (E
 
 const createGroup = `-- name: CreateGroup :one
 
-INSERT INTO groups (org_id, name, teacher_id, course_id, branch_id, direction, schedule_days, capacity)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-RETURNING id, org_id, name, teacher_id, course_id, branch_id, direction, schedule_days, capacity, start_date, end_date, created_at, updated_at
+INSERT INTO groups (org_id, name, teacher_id, course_id, branch_id, direction, schedule_days, capacity, start_time, end_time, room_id)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+RETURNING id, org_id, name, teacher_id, course_id, branch_id, direction, schedule_days, capacity, start_date, end_date, created_at, updated_at, start_time, end_time, room_id
 `
 
 type CreateGroupParams struct {
@@ -519,6 +519,9 @@ type CreateGroupParams struct {
 	Direction    pgtype.Text `json:"direction"`
 	ScheduleDays pgtype.Text `json:"schedule_days"`
 	Capacity     int32       `json:"capacity"`
+	StartTime    string      `json:"start_time"`
+	EndTime      string      `json:"end_time"`
+	RoomID       pgtype.UUID `json:"room_id"`
 }
 
 // --- groups (RLS-scoped: run inside WithTenant) ---
@@ -532,6 +535,9 @@ func (q *Queries) CreateGroup(ctx context.Context, arg CreateGroupParams) (Group
 		arg.Direction,
 		arg.ScheduleDays,
 		arg.Capacity,
+		arg.StartTime,
+		arg.EndTime,
+		arg.RoomID,
 	)
 	var i Group
 	err := row.Scan(
@@ -548,6 +554,9 @@ func (q *Queries) CreateGroup(ctx context.Context, arg CreateGroupParams) (Group
 		&i.EndDate,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.StartTime,
+		&i.EndTime,
+		&i.RoomID,
 	)
 	return i, err
 }
@@ -1658,7 +1667,7 @@ func (q *Queries) GetCourse(ctx context.Context, arg GetCourseParams) (Course, e
 }
 
 const getGroup = `-- name: GetGroup :one
-SELECT id, org_id, name, teacher_id, course_id, branch_id, direction, schedule_days, capacity, start_date, end_date, created_at, updated_at FROM groups WHERE id = $1
+SELECT id, org_id, name, teacher_id, course_id, branch_id, direction, schedule_days, capacity, start_date, end_date, created_at, updated_at, start_time, end_time, room_id FROM groups WHERE id = $1
 `
 
 func (q *Queries) GetGroup(ctx context.Context, id uuid.UUID) (Group, error) {
@@ -1678,6 +1687,9 @@ func (q *Queries) GetGroup(ctx context.Context, id uuid.UUID) (Group, error) {
 		&i.EndDate,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.StartTime,
+		&i.EndTime,
+		&i.RoomID,
 	)
 	return i, err
 }
@@ -2419,7 +2431,7 @@ func (q *Queries) ListExpenses(ctx context.Context, arg ListExpensesParams) ([]E
 }
 
 const listGroups = `-- name: ListGroups :many
-SELECT id, org_id, name, teacher_id, course_id, branch_id, direction, schedule_days, capacity, start_date, end_date, created_at, updated_at FROM groups ORDER BY name ASC
+SELECT id, org_id, name, teacher_id, course_id, branch_id, direction, schedule_days, capacity, start_date, end_date, created_at, updated_at, start_time, end_time, room_id FROM groups ORDER BY name ASC
 `
 
 func (q *Queries) ListGroups(ctx context.Context) ([]Group, error) {
@@ -2445,6 +2457,9 @@ func (q *Queries) ListGroups(ctx context.Context) ([]Group, error) {
 			&i.EndDate,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.StartTime,
+			&i.EndTime,
+			&i.RoomID,
 		); err != nil {
 			return nil, err
 		}
@@ -2457,7 +2472,7 @@ func (q *Queries) ListGroups(ctx context.Context) ([]Group, error) {
 }
 
 const listGroupsByTeacher = `-- name: ListGroupsByTeacher :many
-SELECT id, org_id, name, teacher_id, course_id, branch_id, direction, schedule_days, capacity, start_date, end_date, created_at, updated_at FROM groups WHERE teacher_id = $1 ORDER BY name ASC
+SELECT id, org_id, name, teacher_id, course_id, branch_id, direction, schedule_days, capacity, start_date, end_date, created_at, updated_at, start_time, end_time, room_id FROM groups WHERE teacher_id = $1 ORDER BY name ASC
 `
 
 func (q *Queries) ListGroupsByTeacher(ctx context.Context, teacherID pgtype.UUID) ([]Group, error) {
@@ -2483,6 +2498,9 @@ func (q *Queries) ListGroupsByTeacher(ctx context.Context, teacherID pgtype.UUID
 			&i.EndDate,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.StartTime,
+			&i.EndTime,
+			&i.RoomID,
 		); err != nil {
 			return nil, err
 		}
@@ -3610,9 +3628,9 @@ func (q *Queries) UpdateEnrollment(ctx context.Context, arg UpdateEnrollmentPara
 const updateGroup = `-- name: UpdateGroup :one
 UPDATE groups
 SET name = $2, teacher_id = $3, course_id = $4, branch_id = $5, direction = $6, schedule_days = $7,
-    capacity = $8, updated_at = now()
+    capacity = $8, start_time = $9, end_time = $10, room_id = $11, updated_at = now()
 WHERE id = $1
-RETURNING id, org_id, name, teacher_id, course_id, branch_id, direction, schedule_days, capacity, start_date, end_date, created_at, updated_at
+RETURNING id, org_id, name, teacher_id, course_id, branch_id, direction, schedule_days, capacity, start_date, end_date, created_at, updated_at, start_time, end_time, room_id
 `
 
 type UpdateGroupParams struct {
@@ -3624,6 +3642,9 @@ type UpdateGroupParams struct {
 	Direction    pgtype.Text `json:"direction"`
 	ScheduleDays pgtype.Text `json:"schedule_days"`
 	Capacity     int32       `json:"capacity"`
+	StartTime    string      `json:"start_time"`
+	EndTime      string      `json:"end_time"`
+	RoomID       pgtype.UUID `json:"room_id"`
 }
 
 func (q *Queries) UpdateGroup(ctx context.Context, arg UpdateGroupParams) (Group, error) {
@@ -3636,6 +3657,9 @@ func (q *Queries) UpdateGroup(ctx context.Context, arg UpdateGroupParams) (Group
 		arg.Direction,
 		arg.ScheduleDays,
 		arg.Capacity,
+		arg.StartTime,
+		arg.EndTime,
+		arg.RoomID,
 	)
 	var i Group
 	err := row.Scan(
@@ -3652,6 +3676,9 @@ func (q *Queries) UpdateGroup(ctx context.Context, arg UpdateGroupParams) (Group
 		&i.EndDate,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.StartTime,
+		&i.EndTime,
+		&i.RoomID,
 	)
 	return i, err
 }

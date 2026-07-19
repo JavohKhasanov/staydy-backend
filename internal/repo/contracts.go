@@ -136,6 +136,9 @@ type CreateGroupParams struct {
 	Direction    string
 	ScheduleDays string
 	Capacity     int
+	StartTime    string
+	EndTime      string
+	RoomID       *uuid.UUID
 }
 
 type UpdateGroupParams struct {
@@ -146,6 +149,9 @@ type UpdateGroupParams struct {
 	Direction    string
 	ScheduleDays string
 	Capacity     int
+	StartTime    string
+	EndTime      string
+	RoomID       *uuid.UUID
 }
 
 // GroupRepository is the persistence port for student groups (RLS-scoped). Create/Update map a

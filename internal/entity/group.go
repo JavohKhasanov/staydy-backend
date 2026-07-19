@@ -17,6 +17,9 @@ type Group struct {
 	Direction    string
 	ScheduleDays string
 	Capacity     int
+	StartTime    string // recurring class time "HH:MM"
+	EndTime      string
+	RoomID       *uuid.UUID
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
 }

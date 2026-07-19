@@ -1,4 +1,4 @@
-h1:SYv2cV25yENCxds7Skr11erSh57+TR0zWkBfcTIdbV4=
+h1:DCKmh1JupLLuZaK0k37Uwcw7w7RWdGB2K4/2Crbio0w=
 20260621001046_init.sql h1:0PhWfGa5YtpECqejoxFtDc/dcBRoWHrCZGvQsgwgQZs=
 20260621051500_rls.sql h1:nSxaAZOOpNLTyXoGdnHaVviu4TDnNKhAui7tiFTIYQc=
 20260621060000_composite_fks.sql h1:pk2z0agzhnRTMyfBI/4ULqb7tpnHNRIYXye4TvX65kI=
@@ -25,3 +25,4 @@ h1:SYv2cV25yENCxds7Skr11erSh57+TR0zWkBfcTIdbV4=
 20260701220000_add_branches.sql h1:jTJQzhBYHmWKmfbzvqAGIE8ANbY0080Xbk8kW5xjbqk=
 20260701230000_add_rooms.sql h1:qYEXQ0cNwvBsw69yBmnP4CusO6bDi8JGFFJUcthQplA=
 20260706100000_add_plans.sql h1:Lc7HtsjnRsNK3CgEb3T2kAprsw0eX2/E1Dk0znIeSmQ=
+20260706110000_group_schedule.sql h1:jWsYIlrCIWg/AEJutRV1pADofby2fSM83Gu6CZ+IlfE=

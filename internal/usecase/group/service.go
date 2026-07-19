@@ -36,6 +36,9 @@ type CreateInput struct {
 	Direction    string
 	ScheduleDays string
 	Capacity     int
+	StartTime    string
+	EndTime      string
+	RoomID       *uuid.UUID
 }
 
 func (s *Service) Create(ctx context.Context, orgID uuid.UUID, in CreateInput) (entity.Group, error) {
@@ -54,6 +57,9 @@ func (s *Service) Create(ctx context.Context, orgID uuid.UUID, in CreateInput) (
 		Direction:    strings.TrimSpace(in.Direction),
 		ScheduleDays: strings.TrimSpace(in.ScheduleDays),
 		Capacity:     in.Capacity,
+		StartTime:    strings.TrimSpace(in.StartTime),
+		EndTime:      strings.TrimSpace(in.EndTime),
+		RoomID:       in.RoomID,
 	})
 }
 
@@ -81,6 +87,9 @@ type UpdateInput struct {
 	Direction    string
 	ScheduleDays string
 	Capacity     int
+	StartTime    string
+	EndTime      string
+	RoomID       *uuid.UUID
 }
 
 func (s *Service) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInput) (entity.Group, error) {
@@ -99,6 +108,9 @@ func (s *Service) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInpu
 		Direction:    strings.TrimSpace(in.Direction),
 		ScheduleDays: strings.TrimSpace(in.ScheduleDays),
 		Capacity:     in.Capacity,
+		StartTime:    strings.TrimSpace(in.StartTime),
+		EndTime:      strings.TrimSpace(in.EndTime),
+		RoomID:       in.RoomID,
 	})
 }
 

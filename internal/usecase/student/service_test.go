@@ -30,6 +30,7 @@ func (f *fakeRepo) Create(_ context.Context, orgID uuid.UUID, p repo.CreateStude
 func (f *fakeRepo) Update(_ context.Context, orgID, id uuid.UUID, p repo.UpdateStudentParams) (entity.Student, error) {
 	return entity.Student{ID: id, OrgID: orgID, Name: p.Name, ConfidenceLevel: p.ConfidenceLevel, Status: p.Status}, nil
 }
+func (f *fakeRepo) Delete(context.Context, uuid.UUID, uuid.UUID) error                     { return nil }
 func (f *fakeRepo) List(context.Context, uuid.UUID) ([]entity.Student, error) { return nil, nil }
 func (f *fakeRepo) GetByID(context.Context, uuid.UUID, uuid.UUID) (entity.Student, error) {
 	return f.getResult, f.getErr

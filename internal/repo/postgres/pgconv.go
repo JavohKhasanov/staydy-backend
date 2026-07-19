@@ -245,6 +245,9 @@ func mapGroup(g sqlc.Group) entity.Group {
 		Direction:    textToString(g.Direction),
 		ScheduleDays: textToString(g.ScheduleDays),
 		Capacity:     int(g.Capacity),
+		StartTime:    g.StartTime,
+		EndTime:      g.EndTime,
+		RoomID:       uuidToPtr(g.RoomID),
 		CreatedAt:    g.CreatedAt.Time,
 		UpdatedAt:    g.UpdatedAt.Time,
 	}

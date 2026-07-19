@@ -160,8 +160,8 @@ DELETE FROM refresh_sessions WHERE expires_at < now();
 -- --- groups (RLS-scoped: run inside WithTenant) ---
 
 -- name: CreateGroup :one
-INSERT INTO groups (org_id, name, teacher_id, course_id, branch_id, direction, schedule_days, capacity)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+INSERT INTO groups (org_id, name, teacher_id, course_id, branch_id, direction, schedule_days, capacity, start_time, end_time, room_id)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 RETURNING *;
 
 -- name: ListGroups :many
@@ -176,7 +176,7 @@ SELECT * FROM groups WHERE teacher_id = $1 ORDER BY name ASC;
 -- name: UpdateGroup :one
 UPDATE groups
 SET name = $2, teacher_id = $3, course_id = $4, branch_id = $5, direction = $6, schedule_days = $7,
-    capacity = $8, updated_at = now()
+    capacity = $8, start_time = $9, end_time = $10, room_id = $11, updated_at = now()
 WHERE id = $1
 RETURNING *;
 

@@ -112,6 +112,9 @@ type Group struct {
 	EndDate      pgtype.Date        `json:"end_date"`
 	CreatedAt    pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`
+	StartTime    string             `json:"start_time"`
+	EndTime      string             `json:"end_time"`
+	RoomID       pgtype.UUID        `json:"room_id"`
 }
 
 type HomeworkRecord struct {

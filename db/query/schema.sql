@@ -109,6 +109,9 @@ CREATE TABLE groups (
     end_date      date,
     created_at    timestamptz NOT NULL DEFAULT now(),
     updated_at    timestamptz NOT NULL DEFAULT now(),
+    start_time    text NOT NULL DEFAULT '',    -- recurring class time "HH:MM"
+    end_time      text NOT NULL DEFAULT '',
+    room_id       uuid, -- FK to rooms(id) added by migration (rooms defined later)
     -- needed so students can carry a composite (org_id, group_id) FK.
     UNIQUE (org_id, id)
 );

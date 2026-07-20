@@ -2080,6 +2080,59 @@ func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (User, error) {
 	return i, err
 }
 
+const graceOverdueStudents = `-- name: GraceOverdueStudents :many
+SELECT s.id AS student_id, s.name AS student_name, g.id AS group_id, g.name AS group_name,
+  (
+    SELECT count(*) FROM attendance_records ar
+    WHERE ar.student_id = s.id AND ar.group_id = g.id
+      AND to_char(ar.date, 'YYYY-MM') = $1::text AND ar.status <> 'absent'
+  )::bigint AS attended
+FROM group_members m
+JOIN students s ON s.id = m.student_id
+JOIN groups g ON g.id = m.group_id
+WHERE NOT EXISTS (
+  SELECT 1 FROM invoices i
+  WHERE i.student_id = s.id AND i.group_id = g.id AND i.period = $1::text
+)
+ORDER BY attended DESC
+`
+
+type GraceOverdueStudentsRow struct {
+	StudentID   uuid.UUID `json:"student_id"`
+	StudentName string    `json:"student_name"`
+	GroupID     uuid.UUID `json:"group_id"`
+	GroupName   string    `json:"group_name"`
+	Attended    int64     `json:"attended"`
+}
+
+// Group members who attended sessions this period but have NO invoice for that group yet
+// (the "started studying, hasn't been billed" signal; caller applies the grace threshold).
+func (q *Queries) GraceOverdueStudents(ctx context.Context, period string) ([]GraceOverdueStudentsRow, error) {
+	rows, err := q.db.Query(ctx, graceOverdueStudents, period)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GraceOverdueStudentsRow{}
+	for rows.Next() {
+		var i GraceOverdueStudentsRow
+		if err := rows.Scan(
+			&i.StudentID,
+			&i.StudentName,
+			&i.GroupID,
+			&i.GroupName,
+			&i.Attended,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const groupFinanceByPeriod = `-- name: GroupFinanceByPeriod :many
 SELECT s.id AS student_id, s.name AS student_name,
        COALESCE(SUM(i.amount), 0)::bigint  AS invoiced,
@@ -3579,6 +3632,62 @@ UPDATE students SET group_id = NULL, updated_at = now() WHERE group_id = $1
 func (q *Queries) NullGroupForStudents(ctx context.Context, groupID pgtype.UUID) error {
 	_, err := q.db.Exec(ctx, nullGroupForStudents, groupID)
 	return err
+}
+
+const overdueInvoices = `-- name: OverdueInvoices :many
+SELECT i.id, i.org_id, i.student_id, i.group_id, i.enrollment_id, i.amount, i.paid_amount, i.due_date, i.period, i.note, i.created_at, s.name AS student_name FROM invoices i
+JOIN students s ON s.id = i.student_id
+WHERE i.paid_amount < i.amount AND i.due_date IS NOT NULL AND i.due_date < now()::date
+ORDER BY i.due_date ASC
+`
+
+type OverdueInvoicesRow struct {
+	ID           uuid.UUID          `json:"id"`
+	OrgID        uuid.UUID          `json:"org_id"`
+	StudentID    uuid.UUID          `json:"student_id"`
+	GroupID      pgtype.UUID        `json:"group_id"`
+	EnrollmentID pgtype.UUID        `json:"enrollment_id"`
+	Amount       int64              `json:"amount"`
+	PaidAmount   int64              `json:"paid_amount"`
+	DueDate      pgtype.Date        `json:"due_date"`
+	Period       string             `json:"period"`
+	Note         string             `json:"note"`
+	CreatedAt    pgtype.Timestamptz `json:"created_at"`
+	StudentName  string             `json:"student_name"`
+}
+
+// Unpaid invoices past their due date (payment reminders).
+func (q *Queries) OverdueInvoices(ctx context.Context) ([]OverdueInvoicesRow, error) {
+	rows, err := q.db.Query(ctx, overdueInvoices)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []OverdueInvoicesRow{}
+	for rows.Next() {
+		var i OverdueInvoicesRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.OrgID,
+			&i.StudentID,
+			&i.GroupID,
+			&i.EnrollmentID,
+			&i.Amount,
+			&i.PaidAmount,
+			&i.DueDate,
+			&i.Period,
+			&i.Note,
+			&i.CreatedAt,
+			&i.StudentName,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const removeGroupMember = `-- name: RemoveGroupMember :exec

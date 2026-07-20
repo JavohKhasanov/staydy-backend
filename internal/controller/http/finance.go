@@ -131,6 +131,27 @@ type debtorsOutput struct {
 	}
 }
 
+type overdueInvoiceRow struct {
+	StudentID   string  `json:"studentId"`
+	StudentName string  `json:"studentName"`
+	GroupID     string  `json:"groupId,omitempty"`
+	Balance     int64   `json:"balance"`
+	DueDate     *string `json:"dueDate,omitempty"`
+	Period      string  `json:"period"`
+}
+type graceOverdueRow struct {
+	StudentID   string `json:"studentId"`
+	StudentName string `json:"studentName"`
+	GroupID     string `json:"groupId"`
+	GroupName   string `json:"groupName"`
+	Attended    int64  `json:"attended"`
+}
+type paymentAlertsBody struct {
+	OverdueInvoices []overdueInvoiceRow `json:"overdueInvoices"`
+	GraceOverdue    []graceOverdueRow   `json:"graceOverdue"`
+}
+type paymentAlertsOutput struct{ Body paymentAlertsBody }
+
 type groupFinanceRow struct {
 	StudentID string `json:"studentId"`
 	Name      string `json:"name"`
@@ -410,6 +431,53 @@ func registerFinance(api huma.API, svc *financeusecase.Service, log zerolog.Logg
 				Invoiced:  r.Invoiced,
 				Paid:      r.Paid,
 				Attended:  r.Attended,
+			})
+		}
+		return out, nil
+	})
+
+	Register(api, BearerOperation(huma.Operation{
+		OperationID: "finance-alerts",
+		Method:      http.MethodGet,
+		Path:        "/finance/alerts",
+		Summary:     "Billing alerts: overdue invoices + attending-without-invoice (grace passed)",
+		Tags:        []string{"finance"},
+		Errors:      []int{http.StatusForbidden, http.StatusInternalServerError},
+	}), func(ctx context.Context, _ *financeSummaryInput) (*paymentAlertsOutput, error) {
+		p, err := principal(ctx)
+		if err != nil {
+			return nil, err
+		}
+		overdue, grace, err := svc.PaymentAlerts(ctx, p.OrgID, time.Now().Format("2006-01"))
+		if err != nil {
+			return nil, mapFinanceError(LangFromContext(ctx), err, log)
+		}
+		out := &paymentAlertsOutput{}
+		out.Body.OverdueInvoices = make([]overdueInvoiceRow, 0, len(overdue))
+		for _, o := range overdue {
+			row := overdueInvoiceRow{
+				StudentID:   o.StudentID.String(),
+				StudentName: o.StudentName,
+				Balance:     o.Balance(),
+				Period:      o.Period,
+			}
+			if o.GroupID != nil {
+				row.GroupID = o.GroupID.String()
+			}
+			if o.DueDate != nil {
+				d := o.DueDate.Format("2006-01-02")
+				row.DueDate = &d
+			}
+			out.Body.OverdueInvoices = append(out.Body.OverdueInvoices, row)
+		}
+		out.Body.GraceOverdue = make([]graceOverdueRow, 0, len(grace))
+		for _, g := range grace {
+			out.Body.GraceOverdue = append(out.Body.GraceOverdue, graceOverdueRow{
+				StudentID:   g.StudentID.String(),
+				StudentName: g.StudentName,
+				GroupID:     g.GroupID.String(),
+				GroupName:   g.GroupName,
+				Attended:    g.Attended,
 			})
 		}
 		return out, nil

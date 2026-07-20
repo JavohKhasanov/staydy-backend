@@ -491,6 +491,31 @@ SELECT COALESCE(SUM(amount), 0)::bigint FROM payments
 WHERE paid_at::date >= $2::date AND paid_at::date <= $3::date
   AND student_id IN (SELECT id FROM students WHERE group_id IN (SELECT id FROM groups WHERE teacher_id = $1::uuid));
 
+-- name: OverdueInvoices :many
+-- Unpaid invoices past their due date (payment reminders).
+SELECT i.*, s.name AS student_name FROM invoices i
+JOIN students s ON s.id = i.student_id
+WHERE i.paid_amount < i.amount AND i.due_date IS NOT NULL AND i.due_date < now()::date
+ORDER BY i.due_date ASC;
+
+-- name: GraceOverdueStudents :many
+-- Group members who attended sessions this period but have NO invoice for that group yet
+-- (the "started studying, hasn't been billed" signal; caller applies the grace threshold).
+SELECT s.id AS student_id, s.name AS student_name, g.id AS group_id, g.name AS group_name,
+  (
+    SELECT count(*) FROM attendance_records ar
+    WHERE ar.student_id = s.id AND ar.group_id = g.id
+      AND to_char(ar.date, 'YYYY-MM') = @period::text AND ar.status <> 'absent'
+  )::bigint AS attended
+FROM group_members m
+JOIN students s ON s.id = m.student_id
+JOIN groups g ON g.id = m.group_id
+WHERE NOT EXISTS (
+  SELECT 1 FROM invoices i
+  WHERE i.student_id = s.id AND i.group_id = g.id AND i.period = @period::text
+)
+ORDER BY attended DESC;
+
 -- name: ListDebtors :many
 SELECT s.id AS student_id, s.name, COALESCE(SUM(i.amount - i.paid_amount), 0)::bigint AS balance
 FROM students s

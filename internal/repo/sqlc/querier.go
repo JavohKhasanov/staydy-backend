@@ -108,6 +108,9 @@ type Querier interface {
 	GetStudent(ctx context.Context, id uuid.UUID) (Student, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	GetUserByID(ctx context.Context, id uuid.UUID) (User, error)
+	// Group members who attended sessions this period but have NO invoice for that group yet
+	// (the "started studying, hasn't been billed" signal; caller applies the grace threshold).
+	GraceOverdueStudents(ctx context.Context, period string) ([]GraceOverdueStudentsRow, error)
 	GroupFinanceByPeriod(ctx context.Context, arg GroupFinanceByPeriodParams) ([]GroupFinanceByPeriodRow, error)
 	// Groups that meet on the given weekday but have NO attendance record for the date
 	// (and have at least one student). Powers the "davomat qilinmagan" dashboard alert.
@@ -153,6 +156,8 @@ type Querier interface {
 	MarkLeadConverted(ctx context.Context, arg MarkLeadConvertedParams) error
 	MarkSalarySlipPaid(ctx context.Context, id uuid.UUID) (SalarySlip, error)
 	NullGroupForStudents(ctx context.Context, groupID pgtype.UUID) error
+	// Unpaid invoices past their due date (payment reminders).
+	OverdueInvoices(ctx context.Context) ([]OverdueInvoicesRow, error)
 	RemoveGroupMember(ctx context.Context, arg RemoveGroupMemberParams) error
 	ResolveInterventionTask(ctx context.Context, arg ResolveInterventionTaskParams) (InterventionTask, error)
 	RevokeAllUserSessions(ctx context.Context, userID uuid.UUID) error

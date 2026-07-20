@@ -177,3 +177,26 @@ func defaultMonthRange(from, to time.Time) (time.Time, time.Time) {
 	}
 	return from, to
 }
+
+// GraceLessons is how many attended sessions a new student may have before we flag a missing
+// invoice (center-configurable later).
+const GraceLessons = 3
+
+// PaymentAlerts bundles the billing signals for the notification bell.
+func (s *Service) PaymentAlerts(ctx context.Context, orgID uuid.UUID, period string) ([]entity.OverdueInvoice, []entity.GraceOverdue, error) {
+	overdue, err := s.repo.OverdueInvoices(ctx, orgID)
+	if err != nil {
+		return nil, nil, err
+	}
+	graceAll, err := s.repo.GraceOverdue(ctx, orgID, period)
+	if err != nil {
+		return nil, nil, err
+	}
+	grace := make([]entity.GraceOverdue, 0, len(graceAll))
+	for _, g := range graceAll {
+		if g.Attended >= GraceLessons {
+			grace = append(grace, g)
+		}
+	}
+	return overdue, grace, nil
+}

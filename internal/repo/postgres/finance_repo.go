@@ -319,3 +319,48 @@ func mapPayment(p sqlc.Payment) entity.Payment {
 		CreatedAt: p.CreatedAt.Time,
 	}
 }
+
+func (r *FinanceRepository) OverdueInvoices(ctx context.Context, orgID uuid.UUID) ([]entity.OverdueInvoice, error) {
+	var out []entity.OverdueInvoice
+	err := r.db.WithTenant(ctx, orgID.String(), func(tx pgx.Tx) error {
+		rows, e := sqlc.New(tx).OverdueInvoices(ctx)
+		if e != nil {
+			return e
+		}
+		out = make([]entity.OverdueInvoice, 0, len(rows))
+		for _, row := range rows {
+			out = append(out, entity.OverdueInvoice{
+				Invoice: mapInvoice(sqlc.Invoice{
+					ID: row.ID, OrgID: row.OrgID, StudentID: row.StudentID, GroupID: row.GroupID,
+					EnrollmentID: row.EnrollmentID, Amount: row.Amount, PaidAmount: row.PaidAmount,
+					DueDate: row.DueDate, Period: row.Period, Note: row.Note, CreatedAt: row.CreatedAt,
+				}),
+				StudentName: row.StudentName,
+			})
+		}
+		return nil
+	})
+	return out, err
+}
+
+func (r *FinanceRepository) GraceOverdue(ctx context.Context, orgID uuid.UUID, period string) ([]entity.GraceOverdue, error) {
+	var out []entity.GraceOverdue
+	err := r.db.WithTenant(ctx, orgID.String(), func(tx pgx.Tx) error {
+		rows, e := sqlc.New(tx).GraceOverdueStudents(ctx, period)
+		if e != nil {
+			return e
+		}
+		out = make([]entity.GraceOverdue, 0, len(rows))
+		for _, row := range rows {
+			out = append(out, entity.GraceOverdue{
+				StudentID:   row.StudentID,
+				StudentName: row.StudentName,
+				GroupID:     row.GroupID,
+				GroupName:   row.GroupName,
+				Attended:    row.Attended,
+			})
+		}
+		return nil
+	})
+	return out, err
+}

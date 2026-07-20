@@ -105,3 +105,18 @@ type GroupFinanceRow struct {
 	Paid      int64
 	Attended  int64 // sessions attended in this group this period (grace-period signal)
 }
+
+// OverdueInvoice is an unpaid invoice past its due date (payment reminder).
+type OverdueInvoice struct {
+	Invoice
+	StudentName string
+}
+
+// GraceOverdue flags a group member attending sessions without an invoice this period.
+type GraceOverdue struct {
+	StudentID   uuid.UUID
+	StudentName string
+	GroupID     uuid.UUID
+	GroupName   string
+	Attended    int64
+}

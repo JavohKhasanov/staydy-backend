@@ -28,6 +28,7 @@ type CreateInput struct {
 	Email    string
 	Password string
 	FullName string
+	BranchID *uuid.UUID
 }
 
 func (s *Service) Create(ctx context.Context, orgID uuid.UUID, in CreateInput) (entity.User, error) {
@@ -40,7 +41,7 @@ func (s *Service) Create(ctx context.Context, orgID uuid.UUID, in CreateInput) (
 	if err != nil {
 		return entity.User{}, err
 	}
-	return s.teachers.Create(ctx, orgID, email, hash, fullName)
+	return s.teachers.Create(ctx, orgID, email, hash, fullName, in.BranchID)
 }
 
 func (s *Service) List(ctx context.Context, orgID uuid.UUID) ([]entity.User, error) {
@@ -54,6 +55,7 @@ func (s *Service) Get(ctx context.Context, orgID, id uuid.UUID) (entity.User, er
 type UpdateInput struct {
 	Email    string
 	FullName string
+	BranchID *uuid.UUID
 }
 
 func (s *Service) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInput) (entity.User, error) {
@@ -62,7 +64,7 @@ func (s *Service) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInpu
 	if !strings.Contains(email, "@") || len(email) < 3 || fullName == "" {
 		return entity.User{}, ErrValidation
 	}
-	return s.teachers.Update(ctx, orgID, id, email, fullName)
+	return s.teachers.Update(ctx, orgID, id, email, fullName, in.BranchID)
 }
 
 // SetPassword lets a center_admin reset a teacher's login password.

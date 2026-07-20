@@ -21,6 +21,7 @@ type teacherResponse struct {
 	Email     string `json:"email"`
 	FullName  string `json:"fullName"`
 	Role      string `json:"role"`
+	BranchID  string `json:"branchId,omitempty"`
 	CreatedAt string `json:"createdAt"`
 }
 
@@ -28,11 +29,13 @@ type createTeacherRequest struct {
 	Email    string `json:"email" format:"email" maxLength:"255" example:"ustoz@najot.uz"`
 	Password string `json:"password" minLength:"8" maxLength:"128"`
 	FullName string `json:"fullName" minLength:"1" maxLength:"255" example:"Ali Valiyev"`
+	BranchID string `json:"branchId,omitempty" format:"uuid" doc:"teacher's primary branch"`
 }
 
 type updateTeacherRequest struct {
 	Email    string `json:"email" format:"email" maxLength:"255"`
 	FullName string `json:"fullName" minLength:"1" maxLength:"255"`
+	BranchID string `json:"branchId,omitempty" format:"uuid"`
 }
 type setTeacherPasswordRequest struct {
 	Password string `json:"password" minLength:"8" maxLength:"128"`
@@ -92,10 +95,15 @@ func registerTeachers(api huma.API, svc *teacherusecase.Service, log zerolog.Log
 		if err != nil {
 			return nil, err
 		}
+		branchID, berr := parseOptionalUUID(in.Body.BranchID)
+		if berr != nil {
+			return nil, huma.Error422UnprocessableEntity("invalid branchId")
+		}
 		t, err := svc.Create(ctx, p.OrgID, teacherusecase.CreateInput{
 			Email:    in.Body.Email,
 			Password: in.Body.Password,
 			FullName: in.Body.FullName,
+			BranchID: branchID,
 		})
 		if err != nil {
 			return nil, mapTeacherError(LangFromContext(ctx), err, log)
@@ -142,7 +150,11 @@ func registerTeachers(api huma.API, svc *teacherusecase.Service, log zerolog.Log
 		if perr != nil {
 			return nil, huma.Error422UnprocessableEntity("invalid teacher id")
 		}
-		t, err := svc.Update(ctx, p.OrgID, id, teacherusecase.UpdateInput{Email: in.Body.Email, FullName: in.Body.FullName})
+		branchID, berr := parseOptionalUUID(in.Body.BranchID)
+		if berr != nil {
+			return nil, huma.Error422UnprocessableEntity("invalid branchId")
+		}
+		t, err := svc.Update(ctx, p.OrgID, id, teacherusecase.UpdateInput{Email: in.Body.Email, FullName: in.Body.FullName, BranchID: branchID})
 		if err != nil {
 			return nil, mapTeacherError(LangFromContext(ctx), err, log)
 		}
@@ -196,13 +208,17 @@ func registerTeachers(api huma.API, svc *teacherusecase.Service, log zerolog.Log
 }
 
 func toTeacherResponse(u entity.User) teacherResponse {
-	return teacherResponse{
+	r := teacherResponse{
 		ID:        u.ID.String(),
 		Email:     u.Email,
 		FullName:  u.FullName,
 		Role:      string(u.Role),
 		CreatedAt: u.CreatedAt.UTC().Format(time.RFC3339),
 	}
+	if u.BranchID != nil {
+		r.BranchID = u.BranchID.String()
+	}
+	return r
 }
 
 var (

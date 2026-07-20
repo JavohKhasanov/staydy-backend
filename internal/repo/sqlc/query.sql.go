@@ -1309,6 +1309,45 @@ func (q *Queries) CreateSurvey(ctx context.Context, arg CreateSurveyParams) (Sur
 	return i, err
 }
 
+const createTeacherUser = `-- name: CreateTeacherUser :one
+INSERT INTO users (org_id, email, password_hash, full_name, role, branch_id)
+VALUES ($1, $2, $3, $4, 'teacher', $5)
+RETURNING id, org_id, email, password_hash, full_name, role, phone, is_active, branch_id, created_at, updated_at
+`
+
+type CreateTeacherUserParams struct {
+	OrgID        uuid.UUID   `json:"org_id"`
+	Email        string      `json:"email"`
+	PasswordHash string      `json:"password_hash"`
+	FullName     string      `json:"full_name"`
+	BranchID     pgtype.UUID `json:"branch_id"`
+}
+
+func (q *Queries) CreateTeacherUser(ctx context.Context, arg CreateTeacherUserParams) (User, error) {
+	row := q.db.QueryRow(ctx, createTeacherUser,
+		arg.OrgID,
+		arg.Email,
+		arg.PasswordHash,
+		arg.FullName,
+		arg.BranchID,
+	)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.OrgID,
+		&i.Email,
+		&i.PasswordHash,
+		&i.FullName,
+		&i.Role,
+		&i.Phone,
+		&i.IsActive,
+		&i.BranchID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const createUser = `-- name: CreateUser :one
 INSERT INTO users (org_id, email, password_hash, full_name, role)
 VALUES ($1, $2, $3, $4, $5)
@@ -4248,18 +4287,24 @@ func (q *Queries) UpdateStudentRisk(ctx context.Context, arg UpdateStudentRiskPa
 }
 
 const updateTeacher = `-- name: UpdateTeacher :one
-UPDATE users SET full_name = $2, email = $3, updated_at = now()
+UPDATE users SET full_name = $2, email = $3, branch_id = $4, updated_at = now()
 WHERE id = $1 AND role = 'teacher' RETURNING id, org_id, email, password_hash, full_name, role, phone, is_active, branch_id, created_at, updated_at
 `
 
 type UpdateTeacherParams struct {
-	ID       uuid.UUID `json:"id"`
-	FullName string    `json:"full_name"`
-	Email    string    `json:"email"`
+	ID       uuid.UUID   `json:"id"`
+	FullName string      `json:"full_name"`
+	Email    string      `json:"email"`
+	BranchID pgtype.UUID `json:"branch_id"`
 }
 
 func (q *Queries) UpdateTeacher(ctx context.Context, arg UpdateTeacherParams) (User, error) {
-	row := q.db.QueryRow(ctx, updateTeacher, arg.ID, arg.FullName, arg.Email)
+	row := q.db.QueryRow(ctx, updateTeacher,
+		arg.ID,
+		arg.FullName,
+		arg.Email,
+		arg.BranchID,
+	)
 	var i User
 	err := row.Scan(
 		&i.ID,

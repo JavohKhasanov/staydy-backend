@@ -69,6 +69,7 @@ type Querier interface {
 	CreateStudent(ctx context.Context, arg CreateStudentParams) (Student, error)
 	// --- surveys + attendance + intervention tasks (RLS-scoped: run inside WithTenant) ---
 	CreateSurvey(ctx context.Context, arg CreateSurveyParams) (Survey, error)
+	CreateTeacherUser(ctx context.Context, arg CreateTeacherUserParams) (User, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	DeleteActivity(ctx context.Context, arg DeleteActivityParams) error
 	DeleteBranch(ctx context.Context, id uuid.UUID) error

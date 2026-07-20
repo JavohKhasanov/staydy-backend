@@ -229,6 +229,7 @@ func mapUser(u sqlc.User) entity.User {
 		PasswordHash: u.PasswordHash,
 		FullName:     u.FullName,
 		Role:         entity.UserRole(u.Role),
+		BranchID:     uuidToPtr(u.BranchID),
 		CreatedAt:    u.CreatedAt.Time,
 		UpdatedAt:    u.UpdatedAt.Time,
 	}

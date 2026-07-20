@@ -25,6 +25,7 @@ type User struct {
 	PasswordHash string
 	FullName     string
 	Role         UserRole
+	BranchID     *uuid.UUID // primary branch (teachers); nil = org-wide
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
 }

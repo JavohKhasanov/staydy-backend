@@ -127,8 +127,13 @@ SELECT * FROM users WHERE role = $1 ORDER BY full_name ASC;
 -- name: UpdateUserProfile :one
 UPDATE users SET full_name = $2, updated_at = now() WHERE id = $1 RETURNING *;
 
+-- name: CreateTeacherUser :one
+INSERT INTO users (org_id, email, password_hash, full_name, role, branch_id)
+VALUES ($1, $2, $3, $4, 'teacher', $5)
+RETURNING *;
+
 -- name: UpdateTeacher :one
-UPDATE users SET full_name = $2, email = $3, updated_at = now()
+UPDATE users SET full_name = $2, email = $3, branch_id = $4, updated_at = now()
 WHERE id = $1 AND role = 'teacher' RETURNING *;
 
 -- name: UpdateUserPassword :exec

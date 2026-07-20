@@ -21,16 +21,16 @@ type TeacherRepository struct {
 
 func NewTeacherRepository(db *postgres.DB) *TeacherRepository { return &TeacherRepository{db: db} }
 
-func (r *TeacherRepository) Create(ctx context.Context, orgID uuid.UUID, email, passwordHash, fullName string) (entity.User, error) {
+func (r *TeacherRepository) Create(ctx context.Context, orgID uuid.UUID, email, passwordHash, fullName string, branchID *uuid.UUID) (entity.User, error) {
 	var row sqlc.User
 	err := r.db.WithTenant(ctx, orgID.String(), func(tx pgx.Tx) error {
 		var e error
-		row, e = sqlc.New(tx).CreateUser(ctx, sqlc.CreateUserParams{
+		row, e = sqlc.New(tx).CreateTeacherUser(ctx, sqlc.CreateTeacherUserParams{
 			OrgID:        orgID,
 			Email:        email,
 			PasswordHash: passwordHash,
 			FullName:     fullName,
-			Role:         string(entity.RoleTeacher),
+			BranchID:     nullableUUID(branchID),
 		})
 		return e
 	})
@@ -76,11 +76,11 @@ func (r *TeacherRepository) GetByID(ctx context.Context, orgID, id uuid.UUID) (e
 	return mapUser(row), nil
 }
 
-func (r *TeacherRepository) Update(ctx context.Context, orgID, id uuid.UUID, email, fullName string) (entity.User, error) {
+func (r *TeacherRepository) Update(ctx context.Context, orgID, id uuid.UUID, email, fullName string, branchID *uuid.UUID) (entity.User, error) {
 	var row sqlc.User
 	err := r.db.WithTenant(ctx, orgID.String(), func(tx pgx.Tx) error {
 		var e error
-		row, e = sqlc.New(tx).UpdateTeacher(ctx, sqlc.UpdateTeacherParams{ID: id, FullName: fullName, Email: email})
+		row, e = sqlc.New(tx).UpdateTeacher(ctx, sqlc.UpdateTeacherParams{ID: id, FullName: fullName, Email: email, BranchID: nullableUUID(branchID)})
 		return e
 	})
 	if err != nil {

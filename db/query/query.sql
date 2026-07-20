@@ -183,6 +183,19 @@ RETURNING *;
 -- name: DeleteGroup :exec
 DELETE FROM groups WHERE id = $1;
 
+-- name: GroupsMissingAttendance :many
+-- Groups that meet on the given weekday but have NO attendance record for the date
+-- (and have at least one student). Powers the "davomat qilinmagan" dashboard alert.
+SELECT g.* FROM groups g
+WHERE g.schedule_days LIKE '%' || sqlc.arg(day_code)::text || '%'
+  AND EXISTS (SELECT 1 FROM students s WHERE s.group_id = g.id)
+  AND NOT EXISTS (
+    SELECT 1 FROM attendance_records ar
+    JOIN students s2 ON s2.id = ar.student_id
+    WHERE s2.group_id = g.id AND ar.date = sqlc.arg(date)::date
+  )
+ORDER BY g.start_time ASC;
+
 -- name: CountStudentsInGroup :one
 SELECT count(*) FROM students WHERE group_id = $1;
 

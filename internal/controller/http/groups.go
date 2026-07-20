@@ -51,6 +51,10 @@ type assignGroupRequest struct {
 
 type listGroupsInput struct{}
 type listGroupsOutput struct{ Body []groupResponse }
+type missingAttendanceInput struct {
+	Date string `query:"date" doc:"YYYY-MM-DD (default: today)"`
+}
+
 type groupIDInput struct {
 	ID string `path:"id" format:"uuid"`
 }
@@ -232,6 +236,37 @@ func registerGroups(api huma.API, svc *groupusecase.Service, log zerolog.Logger)
 			return nil, mapGroupError(LangFromContext(ctx), err, log)
 		}
 		return &noContentOutput{}, nil
+	})
+
+	Register(api, BearerOperation(huma.Operation{
+		OperationID: "groups-missing-attendance",
+		Method:      http.MethodGet,
+		Path:        "/groups/attendance-missing",
+		Summary:     "Groups scheduled for the date with no attendance recorded yet",
+		Tags:        []string{"groups"},
+		Errors:      []int{http.StatusUnprocessableEntity, http.StatusForbidden, http.StatusInternalServerError},
+	}), func(ctx context.Context, in *missingAttendanceInput) (*listGroupsOutput, error) {
+		p, err := principal(ctx)
+		if err != nil {
+			return nil, err
+		}
+		date := time.Now()
+		if in.Date != "" {
+			d, derr := time.Parse("2006-01-02", in.Date)
+			if derr != nil {
+				return nil, huma.Error422UnprocessableEntity("date must be YYYY-MM-DD")
+			}
+			date = d
+		}
+		list, err := svc.MissingAttendance(ctx, p.OrgID, date)
+		if err != nil {
+			return nil, mapGroupError(LangFromContext(ctx), err, log)
+		}
+		out := &listGroupsOutput{Body: make([]groupResponse, 0, len(list))}
+		for _, g := range list {
+			out.Body = append(out.Body, toGroupResponse(g))
+		}
+		return out, nil
 	})
 
 	Register(api, BearerOperation(huma.Operation{

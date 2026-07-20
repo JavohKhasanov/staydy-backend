@@ -164,6 +164,8 @@ type GroupRepository interface {
 	Update(ctx context.Context, orgID, id uuid.UUID, p UpdateGroupParams) (entity.Group, error)
 	Delete(ctx context.Context, orgID, id uuid.UUID) error
 	CountStudents(ctx context.Context, orgID, id uuid.UUID) (int64, error)
+	// MissingAttendance lists groups meeting on dayCode ("mon") with no attendance for date.
+	MissingAttendance(ctx context.Context, orgID uuid.UUID, dayCode string, date time.Time) ([]entity.Group, error)
 }
 
 // TeacherRepository manages teacher accounts (users with role 'teacher'), RLS-scoped.

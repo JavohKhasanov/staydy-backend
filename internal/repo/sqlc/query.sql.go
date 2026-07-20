@@ -2066,6 +2066,62 @@ func (q *Queries) GroupFinanceByPeriod(ctx context.Context, arg GroupFinanceByPe
 	return items, nil
 }
 
+const groupsMissingAttendance = `-- name: GroupsMissingAttendance :many
+SELECT g.id, g.org_id, g.name, g.teacher_id, g.course_id, g.branch_id, g.direction, g.schedule_days, g.capacity, g.start_date, g.end_date, g.created_at, g.updated_at, g.start_time, g.end_time, g.room_id FROM groups g
+WHERE g.schedule_days LIKE '%' || $1::text || '%'
+  AND EXISTS (SELECT 1 FROM students s WHERE s.group_id = g.id)
+  AND NOT EXISTS (
+    SELECT 1 FROM attendance_records ar
+    JOIN students s2 ON s2.id = ar.student_id
+    WHERE s2.group_id = g.id AND ar.date = $2::date
+  )
+ORDER BY g.start_time ASC
+`
+
+type GroupsMissingAttendanceParams struct {
+	DayCode string      `json:"day_code"`
+	Date    pgtype.Date `json:"date"`
+}
+
+// Groups that meet on the given weekday but have NO attendance record for the date
+// (and have at least one student). Powers the "davomat qilinmagan" dashboard alert.
+func (q *Queries) GroupsMissingAttendance(ctx context.Context, arg GroupsMissingAttendanceParams) ([]Group, error) {
+	rows, err := q.db.Query(ctx, groupsMissingAttendance, arg.DayCode, arg.Date)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Group{}
+	for rows.Next() {
+		var i Group
+		if err := rows.Scan(
+			&i.ID,
+			&i.OrgID,
+			&i.Name,
+			&i.TeacherID,
+			&i.CourseID,
+			&i.BranchID,
+			&i.Direction,
+			&i.ScheduleDays,
+			&i.Capacity,
+			&i.StartDate,
+			&i.EndDate,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.StartTime,
+			&i.EndTime,
+			&i.RoomID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const highRiskStudents = `-- name: HighRiskStudents :many
 SELECT id, org_id, name, phone, telegram_id, telegram_chat_id, course_name, group_name, group_id, mentor_name, start_date, onboarding_goal, six_month_target, weekly_study_hours, confidence_level, risk_score, risk_tier, email, birth_date, gender, second_phone, address, parent_name, parent_phone, student_code, status, mentor_id, branch_id, created_at, updated_at FROM students
 WHERE risk_tier IN ('Red', 'Yellow')

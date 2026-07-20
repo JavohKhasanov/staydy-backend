@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -150,4 +151,24 @@ func (r *GroupRepository) CountStudents(ctx context.Context, orgID, id uuid.UUID
 		return e
 	})
 	return n, err
+}
+
+func (r *GroupRepository) MissingAttendance(ctx context.Context, orgID uuid.UUID, dayCode string, date time.Time) ([]entity.Group, error) {
+	var rows []sqlc.Group
+	err := r.db.WithTenant(ctx, orgID.String(), func(tx pgx.Tx) error {
+		var e error
+		rows, e = sqlc.New(tx).GroupsMissingAttendance(ctx, sqlc.GroupsMissingAttendanceParams{
+			DayCode: dayCode,
+			Date:    dateVal(&date),
+		})
+		return e
+	})
+	if err != nil {
+		return nil, err
+	}
+	out := make([]entity.Group, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, mapGroup(row))
+	}
+	return out, nil
 }

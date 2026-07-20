@@ -107,6 +107,9 @@ type Querier interface {
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	GetUserByID(ctx context.Context, id uuid.UUID) (User, error)
 	GroupFinanceByPeriod(ctx context.Context, arg GroupFinanceByPeriodParams) ([]GroupFinanceByPeriodRow, error)
+	// Groups that meet on the given weekday but have NO attendance record for the date
+	// (and have at least one student). Powers the "davomat qilinmagan" dashboard alert.
+	GroupsMissingAttendance(ctx context.Context, arg GroupsMissingAttendanceParams) ([]Group, error)
 	HighRiskStudents(ctx context.Context) ([]Student, error)
 	ListActivePlans(ctx context.Context) ([]Plan, error)
 	ListActivities(ctx context.Context, arg ListActivitiesParams) ([]Activity, error)

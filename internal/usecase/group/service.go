@@ -8,6 +8,7 @@ import (
 	"errors"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -112,6 +113,13 @@ func (s *Service) Update(ctx context.Context, orgID, id uuid.UUID, in UpdateInpu
 		EndTime:      strings.TrimSpace(in.EndTime),
 		RoomID:       in.RoomID,
 	})
+}
+
+// MissingAttendance lists today's (or the given date's) sessions with no attendance yet —
+// the admin's "dars bo'ldi, davomat yo'q" alert. The weekday code is derived from the date.
+func (s *Service) MissingAttendance(ctx context.Context, orgID uuid.UUID, date time.Time) ([]entity.Group, error) {
+	dayCode := strings.ToLower(date.Weekday().String()[:3]) // "mon".."sun"
+	return s.groups.MissingAttendance(ctx, orgID, dayCode, date)
 }
 
 func (s *Service) Delete(ctx context.Context, orgID, id uuid.UUID) error {

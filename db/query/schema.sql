@@ -14,6 +14,7 @@ CREATE TABLE organizations (
     status     text NOT NULL DEFAULT 'active', -- 'active' | 'suspended' (suspended → login blocked)
     trial_ends_at  timestamptz DEFAULT (now() + interval '30 days'), -- free month; Payme/Click gateway is post-MVP
     billing_status text NOT NULL DEFAULT 'trial', -- 'trial' | 'active' (paid) | 'expired'
+    grace_lessons  int NOT NULL DEFAULT 3, -- attended sessions allowed before missing-invoice flag
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now()
 );

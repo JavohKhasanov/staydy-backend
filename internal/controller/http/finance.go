@@ -152,6 +152,12 @@ type paymentAlertsBody struct {
 }
 type paymentAlertsOutput struct{ Body paymentAlertsBody }
 
+type billingSettingsBody struct {
+	GraceLessons int `json:"graceLessons" minimum:"0" maximum:"30" doc:"attended sessions allowed before missing-invoice flag"`
+}
+type billingSettingsInput struct{ Body billingSettingsBody }
+type billingSettingsOutput struct{ Body billingSettingsBody }
+
 type groupFinanceRow struct {
 	StudentID string `json:"studentId"`
 	Name      string `json:"name"`
@@ -484,6 +490,43 @@ func registerFinance(api huma.API, svc *financeusecase.Service, log zerolog.Logg
 	})
 
 	Register(api, BearerOperation(huma.Operation{
+		OperationID: "billing-settings-get",
+		Method:      http.MethodGet,
+		Path:        "/finance/settings",
+		Summary:     "Center billing rules (grace lessons)",
+		Tags:        []string{"finance"},
+		Errors:      []int{http.StatusForbidden, http.StatusInternalServerError},
+	}), func(ctx context.Context, _ *financeSummaryInput) (*billingSettingsOutput, error) {
+		p, err := principal(ctx)
+		if err != nil {
+			return nil, err
+		}
+		n, err := svc.GraceLessons(ctx, p.OrgID)
+		if err != nil {
+			return nil, mapFinanceError(LangFromContext(ctx), err, log)
+		}
+		return &billingSettingsOutput{Body: billingSettingsBody{GraceLessons: n}}, nil
+	})
+
+	Register(api, BearerOperation(huma.Operation{
+		OperationID: "billing-settings-update",
+		Method:      http.MethodPut,
+		Path:        "/finance/settings",
+		Summary:     "Update center billing rules",
+		Tags:        []string{"finance"},
+		Errors:      []int{http.StatusUnprocessableEntity, http.StatusForbidden, http.StatusInternalServerError},
+	}), func(ctx context.Context, in *billingSettingsInput) (*billingSettingsOutput, error) {
+		p, err := principal(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if err := svc.SetGraceLessons(ctx, p.OrgID, in.Body.GraceLessons); err != nil {
+			return nil, mapFinanceError(LangFromContext(ctx), err, log)
+		}
+		return &billingSettingsOutput{Body: in.Body}, nil
+	})
+
+	Register(api, BearerOperation(huma.Operation{
 		OperationID: "expenses-list",
 		Method:      http.MethodGet,
 		Path:        "/finance/expenses",
@@ -637,6 +680,8 @@ var msgInvoiceNotFound = i18n.Message{UZ: "Hisob topilmadi.", RU: "Счёт не
 
 func mapFinanceError(lang i18n.Lang, err error, log zerolog.Logger) error {
 	switch {
+	case errors.Is(err, repo.ErrOverpay):
+		return huma.Error422UnprocessableEntity("To'lov qoldiqdan oshib ketdi — avval hisob summasini tekshiring")
 	case errors.Is(err, financeusecase.ErrValidation):
 		return huma.Error422UnprocessableEntity(err.Error())
 	case errors.Is(err, repo.ErrNotFound):

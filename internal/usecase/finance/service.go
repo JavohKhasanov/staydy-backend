@@ -178,9 +178,6 @@ func defaultMonthRange(from, to time.Time) (time.Time, time.Time) {
 	return from, to
 }
 
-// GraceLessons is how many attended sessions a new student may have before we flag a missing
-// invoice (center-configurable later).
-const GraceLessons = 3
 
 // PaymentAlerts bundles the billing signals for the notification bell.
 func (s *Service) PaymentAlerts(ctx context.Context, orgID uuid.UUID, period string) ([]entity.OverdueInvoice, []entity.GraceOverdue, error) {
@@ -192,11 +189,31 @@ func (s *Service) PaymentAlerts(ctx context.Context, orgID uuid.UUID, period str
 	if err != nil {
 		return nil, nil, err
 	}
+	threshold, err := s.repo.GetGraceLessons(ctx, orgID)
+	if err != nil || threshold <= 0 {
+		threshold = 3
+	}
 	grace := make([]entity.GraceOverdue, 0, len(graceAll))
 	for _, g := range graceAll {
-		if g.Attended >= GraceLessons {
+		if g.Attended >= int64(threshold) {
 			grace = append(grace, g)
 		}
 	}
 	return overdue, grace, nil
+}
+
+// GraceLessons reads the center's grace threshold (attended sessions before flagging).
+func (s *Service) GraceLessons(ctx context.Context, orgID uuid.UUID) (int, error) {
+	n, err := s.repo.GetGraceLessons(ctx, orgID)
+	if err != nil {
+		return 3, err
+	}
+	return n, nil
+}
+
+func (s *Service) SetGraceLessons(ctx context.Context, orgID uuid.UUID, n int) error {
+	if n < 0 || n > 30 {
+		return ErrValidation
+	}
+	return s.repo.SetGraceLessons(ctx, orgID, n)
 }

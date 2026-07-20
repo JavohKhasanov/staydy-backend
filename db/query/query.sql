@@ -33,6 +33,12 @@ UPDATE organizations SET plan = $2, status = $3, updated_at = now() WHERE id = $
 UPDATE organizations SET plan = $2, billing_status = $3, trial_ends_at = $4, updated_at = now()
 WHERE id = $1 RETURNING *;
 
+-- name: GetGraceLessons :one
+SELECT grace_lessons FROM organizations WHERE id = $1;
+
+-- name: SetGraceLessons :exec
+UPDATE organizations SET grace_lessons = $2, updated_at = now() WHERE id = $1;
+
 -- name: DeleteOrganization :exec
 DELETE FROM organizations WHERE id = $1;
 

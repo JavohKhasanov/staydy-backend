@@ -106,6 +106,11 @@ func (r *FinanceRepository) RecordPayment(ctx context.Context, orgID uuid.UUID, 
 		if e != nil {
 			return e // pgx.ErrNoRows → invoice not found
 		}
+		// Positive payments may not exceed the remaining balance (refunds are negative and skip
+		// this; prepayment/credit is a separate future feature).
+		if p.Amount > 0 && p.Amount > inv.Amount-inv.PaidAmount {
+			return repo.ErrOverpay
+		}
 		paidAt := time.Now()
 		if p.PaidAt != nil {
 			paidAt = *p.PaidAt
@@ -363,4 +368,14 @@ func (r *FinanceRepository) GraceOverdue(ctx context.Context, orgID uuid.UUID, p
 		return nil
 	})
 	return out, err
+}
+
+// Grace setting lives on organizations (non-RLS) — read/write via the pool directly.
+func (r *FinanceRepository) GetGraceLessons(ctx context.Context, orgID uuid.UUID) (int, error) {
+	n, err := sqlc.New(r.db.Pool).GetGraceLessons(ctx, orgID)
+	return int(n), err
+}
+
+func (r *FinanceRepository) SetGraceLessons(ctx context.Context, orgID uuid.UUID, n int) error {
+	return sqlc.New(r.db.Pool).SetGraceLessons(ctx, sqlc.SetGraceLessonsParams{ID: orgID, GraceLessons: int32(n)})
 }

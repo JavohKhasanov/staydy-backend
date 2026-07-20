@@ -896,7 +896,7 @@ const createOrganization = `-- name: CreateOrganization :one
 
 INSERT INTO organizations (name, slug, plan)
 VALUES ($1, $2, $3)
-RETURNING id, name, slug, plan, status, trial_ends_at, billing_status, created_at, updated_at
+RETURNING id, name, slug, plan, status, trial_ends_at, billing_status, grace_lessons, created_at, updated_at
 `
 
 type CreateOrganizationParams struct {
@@ -921,6 +921,7 @@ func (q *Queries) CreateOrganization(ctx context.Context, arg CreateOrganization
 		&i.Status,
 		&i.TrialEndsAt,
 		&i.BillingStatus,
+		&i.GraceLessons,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -1727,6 +1728,17 @@ func (q *Queries) GetCourse(ctx context.Context, arg GetCourseParams) (Course, e
 	return i, err
 }
 
+const getGraceLessons = `-- name: GetGraceLessons :one
+SELECT grace_lessons FROM organizations WHERE id = $1
+`
+
+func (q *Queries) GetGraceLessons(ctx context.Context, id uuid.UUID) (int32, error) {
+	row := q.db.QueryRow(ctx, getGraceLessons, id)
+	var grace_lessons int32
+	err := row.Scan(&grace_lessons)
+	return grace_lessons, err
+}
+
 const getGroup = `-- name: GetGroup :one
 SELECT id, org_id, name, teacher_id, course_id, branch_id, direction, schedule_days, capacity, start_date, end_date, created_at, updated_at, start_time, end_time, room_id FROM groups WHERE id = $1
 `
@@ -1885,7 +1897,7 @@ func (q *Queries) GetLessonByGroupDate(ctx context.Context, arg GetLessonByGroup
 }
 
 const getOrganizationByID = `-- name: GetOrganizationByID :one
-SELECT id, name, slug, plan, status, trial_ends_at, billing_status, created_at, updated_at FROM organizations WHERE id = $1
+SELECT id, name, slug, plan, status, trial_ends_at, billing_status, grace_lessons, created_at, updated_at FROM organizations WHERE id = $1
 `
 
 func (q *Queries) GetOrganizationByID(ctx context.Context, id uuid.UUID) (Organization, error) {
@@ -1899,6 +1911,7 @@ func (q *Queries) GetOrganizationByID(ctx context.Context, id uuid.UUID) (Organi
 		&i.Status,
 		&i.TrialEndsAt,
 		&i.BillingStatus,
+		&i.GraceLessons,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -1906,7 +1919,7 @@ func (q *Queries) GetOrganizationByID(ctx context.Context, id uuid.UUID) (Organi
 }
 
 const getOrganizationBySlug = `-- name: GetOrganizationBySlug :one
-SELECT id, name, slug, plan, status, trial_ends_at, billing_status, created_at, updated_at FROM organizations WHERE slug = $1
+SELECT id, name, slug, plan, status, trial_ends_at, billing_status, grace_lessons, created_at, updated_at FROM organizations WHERE slug = $1
 `
 
 func (q *Queries) GetOrganizationBySlug(ctx context.Context, slug string) (Organization, error) {
@@ -1920,6 +1933,7 @@ func (q *Queries) GetOrganizationBySlug(ctx context.Context, slug string) (Organ
 		&i.Status,
 		&i.TrialEndsAt,
 		&i.BillingStatus,
+		&i.GraceLessons,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -2405,7 +2419,7 @@ func (q *Queries) ListAllOrgIDs(ctx context.Context) ([]uuid.UUID, error) {
 }
 
 const listAllOrganizations = `-- name: ListAllOrganizations :many
-SELECT id, name, slug, plan, status, trial_ends_at, billing_status, created_at, updated_at FROM organizations ORDER BY created_at DESC
+SELECT id, name, slug, plan, status, trial_ends_at, billing_status, grace_lessons, created_at, updated_at FROM organizations ORDER BY created_at DESC
 `
 
 // NON-RLS: superadmin center list (full rows; the caller filters out the platform org).
@@ -2426,6 +2440,7 @@ func (q *Queries) ListAllOrganizations(ctx context.Context) ([]Organization, err
 			&i.Status,
 			&i.TrialEndsAt,
 			&i.BillingStatus,
+			&i.GraceLessons,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 		); err != nil {
@@ -3808,6 +3823,20 @@ func (q *Queries) SetBotConversationFlow(ctx context.Context, arg SetBotConversa
 	return err
 }
 
+const setGraceLessons = `-- name: SetGraceLessons :exec
+UPDATE organizations SET grace_lessons = $2, updated_at = now() WHERE id = $1
+`
+
+type SetGraceLessonsParams struct {
+	ID           uuid.UUID `json:"id"`
+	GraceLessons int32     `json:"grace_lessons"`
+}
+
+func (q *Queries) SetGraceLessons(ctx context.Context, arg SetGraceLessonsParams) error {
+	_, err := q.db.Exec(ctx, setGraceLessons, arg.ID, arg.GraceLessons)
+	return err
+}
+
 const setLeadStage = `-- name: SetLeadStage :one
 UPDATE leads SET stage = $3, updated_at = now() WHERE org_id = $1 AND id = $2 RETURNING id, org_id, name, phone, email, source, stage, interest, note, assigned_to, student_id, created_at, updated_at
 `
@@ -4267,7 +4296,7 @@ func (q *Queries) UpdateOpenTaskReasons(ctx context.Context, arg UpdateOpenTaskR
 
 const updateOrgBilling = `-- name: UpdateOrgBilling :one
 UPDATE organizations SET plan = $2, billing_status = $3, trial_ends_at = $4, updated_at = now()
-WHERE id = $1 RETURNING id, name, slug, plan, status, trial_ends_at, billing_status, created_at, updated_at
+WHERE id = $1 RETURNING id, name, slug, plan, status, trial_ends_at, billing_status, grace_lessons, created_at, updated_at
 `
 
 type UpdateOrgBillingParams struct {
@@ -4293,6 +4322,7 @@ func (q *Queries) UpdateOrgBilling(ctx context.Context, arg UpdateOrgBillingPara
 		&i.Status,
 		&i.TrialEndsAt,
 		&i.BillingStatus,
+		&i.GraceLessons,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -4300,7 +4330,7 @@ func (q *Queries) UpdateOrgBilling(ctx context.Context, arg UpdateOrgBillingPara
 }
 
 const updateOrgPlanStatus = `-- name: UpdateOrgPlanStatus :one
-UPDATE organizations SET plan = $2, status = $3, updated_at = now() WHERE id = $1 RETURNING id, name, slug, plan, status, trial_ends_at, billing_status, created_at, updated_at
+UPDATE organizations SET plan = $2, status = $3, updated_at = now() WHERE id = $1 RETURNING id, name, slug, plan, status, trial_ends_at, billing_status, grace_lessons, created_at, updated_at
 `
 
 type UpdateOrgPlanStatusParams struct {
@@ -4320,6 +4350,7 @@ func (q *Queries) UpdateOrgPlanStatus(ctx context.Context, arg UpdateOrgPlanStat
 		&i.Status,
 		&i.TrialEndsAt,
 		&i.BillingStatus,
+		&i.GraceLessons,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)

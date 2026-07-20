@@ -227,6 +227,7 @@ type Organization struct {
 	Status        string             `json:"status"`
 	TrialEndsAt   pgtype.Timestamptz `json:"trial_ends_at"`
 	BillingStatus string             `json:"billing_status"`
+	GraceLessons  int32              `json:"grace_lessons"`
 	CreatedAt     pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
 }

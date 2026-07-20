@@ -18,6 +18,8 @@ var (
 	// ErrSessionReused signals that an already-revoked refresh token was replayed — a
 	// breach indicator. RotateSession revokes the whole token family when it happens.
 	ErrSessionReused = errors.New("repo: refresh token reuse detected")
+	// ErrOverpay means a payment exceeds the invoice's remaining balance.
+	ErrOverpay = errors.New("repo: payment exceeds invoice balance")
 )
 
 // ProvisionParams creates an organization plus its first admin atomically.
@@ -401,6 +403,8 @@ type FinanceRepository interface {
 	Summary(ctx context.Context, orgID uuid.UUID) (entity.FinanceSummary, error)
 	ListDebtors(ctx context.Context, orgID uuid.UUID) ([]entity.Debtor, error)
 	OverdueInvoices(ctx context.Context, orgID uuid.UUID) ([]entity.OverdueInvoice, error)
+	GetGraceLessons(ctx context.Context, orgID uuid.UUID) (int, error)
+	SetGraceLessons(ctx context.Context, orgID uuid.UUID, n int) error
 	GraceOverdue(ctx context.Context, orgID uuid.UUID, period string) ([]entity.GraceOverdue, error)
 	// GroupFinance returns each group member's invoiced/paid totals for a period ("2026-07").
 	GroupFinance(ctx context.Context, orgID, groupID uuid.UUID, period string) ([]entity.GroupFinanceRow, error)

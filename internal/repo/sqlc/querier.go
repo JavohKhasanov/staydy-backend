@@ -94,6 +94,7 @@ type Querier interface {
 	FinanceSummary(ctx context.Context, dollar_1 uuid.UUID) (FinanceSummaryRow, error)
 	GetBotConversation(ctx context.Context, telegramChatID int64) (BotConversation, error)
 	GetCourse(ctx context.Context, arg GetCourseParams) (Course, error)
+	GetGraceLessons(ctx context.Context, id uuid.UUID) (int32, error)
 	GetGroup(ctx context.Context, id uuid.UUID) (Group, error)
 	GetInterventionTask(ctx context.Context, id uuid.UUID) (InterventionTask, error)
 	GetInviteToken(ctx context.Context, token string) (InviteToken, error)
@@ -164,6 +165,7 @@ type Querier interface {
 	RevokeRefreshSession(ctx context.Context, id uuid.UUID) error
 	RiskByGroup(ctx context.Context) ([]RiskByGroupRow, error)
 	SetBotConversationFlow(ctx context.Context, arg SetBotConversationFlowParams) error
+	SetGraceLessons(ctx context.Context, arg SetGraceLessonsParams) error
 	SetLeadStage(ctx context.Context, arg SetLeadStageParams) (Lead, error)
 	SetStudentTelegramChat(ctx context.Context, arg SetStudentTelegramChatParams) error
 	SlugExists(ctx context.Context, slug string) (bool, error)

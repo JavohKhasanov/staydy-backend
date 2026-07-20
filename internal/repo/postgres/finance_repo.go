@@ -48,6 +48,7 @@ func (r *FinanceRepository) CreateInvoice(ctx context.Context, orgID uuid.UUID, 
 		row, e = sqlc.New(tx).CreateInvoice(ctx, sqlc.CreateInvoiceParams{
 			OrgID:        orgID,
 			StudentID:    p.StudentID,
+			GroupID:      nullableUUID(p.GroupID),
 			EnrollmentID: nullableUUID(p.EnrollmentID),
 			Amount:       p.Amount,
 			DueDate:      dateVal(p.DueDate),
@@ -281,6 +282,7 @@ func (r *FinanceRepository) GroupFinance(ctx context.Context, orgID, groupID uui
 				Name:      row.StudentName,
 				Invoiced:  row.Invoiced,
 				Paid:      row.Paid,
+				Attended:  row.Attended,
 			})
 		}
 		return nil
@@ -293,6 +295,7 @@ func mapInvoice(i sqlc.Invoice) entity.Invoice {
 		ID:           i.ID,
 		OrgID:        i.OrgID,
 		StudentID:    i.StudentID,
+		GroupID:      uuidToPtr(i.GroupID),
 		EnrollmentID: uuidToPtr(i.EnrollmentID),
 		Amount:       i.Amount,
 		PaidAmount:   i.PaidAmount,

@@ -12,6 +12,7 @@ type Invoice struct {
 	ID           uuid.UUID
 	OrgID        uuid.UUID
 	StudentID    uuid.UUID
+	GroupID      *uuid.UUID // which group (course) the charge is for
 	EnrollmentID *uuid.UUID
 	Amount       int64 // total owed, whole UZS so'm
 	PaidAmount   int64
@@ -102,4 +103,5 @@ type GroupFinanceRow struct {
 	Name      string
 	Invoiced  int64
 	Paid      int64
+	Attended  int64 // sessions attended in this group this period (grace-period signal)
 }

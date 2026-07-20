@@ -20,6 +20,7 @@ import (
 type invoiceResponse struct {
 	ID         string  `json:"id"`
 	StudentID  string  `json:"studentId"`
+	GroupID    string  `json:"groupId,omitempty"`
 	Amount     int64   `json:"amount"`
 	PaidAmount int64   `json:"paidAmount"`
 	Balance    int64   `json:"balance"`
@@ -55,6 +56,7 @@ type createInvoiceInput struct {
 	ID   string `path:"id" format:"uuid"`
 	Body struct {
 		Amount   int64  `json:"amount" minimum:"1" doc:"whole UZS so'm"`
+		GroupID  string `json:"groupId,omitempty" format:"uuid" doc:"which group (course) the charge is for"`
 		DueDate  string `json:"dueDate,omitempty" doc:"YYYY-MM-DD"`
 		Period   string `json:"period,omitempty" example:"2026-07"`
 		Note     string `json:"note,omitempty" maxLength:"500"`
@@ -134,6 +136,7 @@ type groupFinanceRow struct {
 	Name      string `json:"name"`
 	Invoiced  int64  `json:"invoiced"`
 	Paid      int64  `json:"paid"`
+	Attended  int64  `json:"attended"`
 }
 type groupFinanceBody struct {
 	Period   string            `json:"period"`
@@ -206,7 +209,12 @@ func registerFinance(api huma.API, svc *financeusecase.Service, log zerolog.Logg
 		if derr != nil {
 			return nil, huma.Error422UnprocessableEntity("invalid enrollmentId")
 		}
+		gidInv, gierr := parseOptUUID(in.Body.GroupID)
+		if gierr != nil {
+			return nil, huma.Error422UnprocessableEntity("invalid groupId")
+		}
 		iv, err := svc.CreateInvoice(ctx, p.OrgID, sid, financeusecase.InvoiceInput{
+			GroupID:      gidInv,
 			EnrollmentID: enr,
 			Amount:       in.Body.Amount,
 			DueDate:      due,
@@ -401,6 +409,7 @@ func registerFinance(api huma.API, svc *financeusecase.Service, log zerolog.Logg
 				Name:      r.Name,
 				Invoiced:  r.Invoiced,
 				Paid:      r.Paid,
+				Attended:  r.Attended,
 			})
 		}
 		return out, nil
@@ -533,6 +542,9 @@ func toInvoiceResponse(i entity.Invoice, now time.Time) invoiceResponse {
 		Period:     i.Period,
 		Note:       i.Note,
 		CreatedAt:  i.CreatedAt.UTC().Format(time.RFC3339),
+	}
+	if i.GroupID != nil {
+		r.GroupID = i.GroupID.String()
 	}
 	if i.DueDate != nil {
 		s := i.DueDate.Format("2006-01-02")

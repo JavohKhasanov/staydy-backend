@@ -394,8 +394,8 @@ SELECT * FROM invoices WHERE student_id = $1 ORDER BY due_date DESC NULLS LAST, 
 SELECT * FROM invoices WHERE org_id = $1 AND id = $2;
 
 -- name: CreateInvoice :one
-INSERT INTO invoices (org_id, student_id, enrollment_id, amount, due_date, period, note)
-VALUES ($1, $2, $3, $4, $5, $6, $7)
+INSERT INTO invoices (org_id, student_id, group_id, enrollment_id, amount, due_date, period, note)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 RETURNING *;
 
 -- name: DeleteInvoice :exec
@@ -502,10 +502,15 @@ ORDER BY balance DESC;
 -- name: GroupFinanceByPeriod :many
 SELECT s.id AS student_id, s.name AS student_name,
        COALESCE(SUM(i.amount), 0)::bigint  AS invoiced,
-       COALESCE(SUM(i.paid_amount), 0)::bigint AS paid
+       COALESCE(SUM(i.paid_amount), 0)::bigint AS paid,
+       (
+         SELECT count(*) FROM attendance_records ar
+         WHERE ar.student_id = s.id AND ar.group_id = @group_id::uuid
+           AND to_char(ar.date, 'YYYY-MM') = @period::text AND ar.status <> 'absent'
+       )::bigint AS attended
 FROM students s
 JOIN group_members m ON m.student_id = s.id AND m.group_id = @group_id::uuid
-LEFT JOIN invoices i ON i.student_id = s.id AND i.period = @period::text
+LEFT JOIN invoices i ON i.student_id = s.id AND i.period = @period::text AND i.group_id = @group_id::uuid
 GROUP BY s.id, s.name
 ORDER BY s.name ASC;
 

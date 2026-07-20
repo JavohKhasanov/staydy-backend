@@ -285,6 +285,7 @@ CREATE TABLE invoices (
     id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     org_id        uuid NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
     student_id    uuid NOT NULL,
+    group_id      uuid, -- which group (course) the charge is for; NULL = general
     enrollment_id uuid,
     amount        bigint NOT NULL,
     paid_amount   bigint NOT NULL DEFAULT 0,

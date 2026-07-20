@@ -439,6 +439,7 @@ type SalarySlipParams struct {
 
 type CreateInvoiceParams struct {
 	StudentID    uuid.UUID
+	GroupID      *uuid.UUID // which group (course) the charge is for
 	EnrollmentID *uuid.UUID
 	Amount       int64
 	DueDate      *time.Time

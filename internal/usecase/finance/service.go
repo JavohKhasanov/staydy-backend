@@ -36,6 +36,7 @@ func (s *Service) StudentBalance(ctx context.Context, orgID, studentID uuid.UUID
 }
 
 type InvoiceInput struct {
+	GroupID      *uuid.UUID
 	EnrollmentID *uuid.UUID
 	Amount       int64
 	DueDate      *time.Time
@@ -49,6 +50,7 @@ func (s *Service) CreateInvoice(ctx context.Context, orgID, studentID uuid.UUID,
 	}
 	return s.repo.CreateInvoice(ctx, orgID, repo.CreateInvoiceParams{
 		StudentID:    studentID,
+		GroupID:      in.GroupID,
 		EnrollmentID: in.EnrollmentID,
 		Amount:       in.Amount,
 		DueDate:      in.DueDate,

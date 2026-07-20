@@ -1,4 +1,4 @@
-h1:HU8DHjk1x0tmXKEjqdE07kg1/FfnLS3WkQx69u3n23I=
+h1:kCGdV1MIYu7l16efgNINgR92EIV6kNq1UzVbHyafIUQ=
 20260621001046_init.sql h1:0PhWfGa5YtpECqejoxFtDc/dcBRoWHrCZGvQsgwgQZs=
 20260621051500_rls.sql h1:nSxaAZOOpNLTyXoGdnHaVviu4TDnNKhAui7tiFTIYQc=
 20260621060000_composite_fks.sql h1:pk2z0agzhnRTMyfBI/4ULqb7tpnHNRIYXye4TvX65kI=
@@ -27,3 +27,4 @@ h1:HU8DHjk1x0tmXKEjqdE07kg1/FfnLS3WkQx69u3n23I=
 20260706100000_add_plans.sql h1:Lc7HtsjnRsNK3CgEb3T2kAprsw0eX2/E1Dk0znIeSmQ=
 20260706110000_group_schedule.sql h1:jWsYIlrCIWg/AEJutRV1pADofby2fSM83Gu6CZ+IlfE=
 20260721100000_group_members.sql h1:00/gIAF1Po6k0ix7fzTo4eaZb+qLGzCCp9gLyJU2XeQ=
+20260721110000_invoice_group.sql h1:1tp5Avn6RPwJb0YU0btf+Qgd7TOOzCRydwdzzYCUNo8=

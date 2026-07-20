@@ -160,6 +160,7 @@ type Invoice struct {
 	ID           uuid.UUID          `json:"id"`
 	OrgID        uuid.UUID          `json:"org_id"`
 	StudentID    uuid.UUID          `json:"student_id"`
+	GroupID      pgtype.UUID        `json:"group_id"`
 	EnrollmentID pgtype.UUID        `json:"enrollment_id"`
 	Amount       int64              `json:"amount"`
 	PaidAmount   int64              `json:"paid_amount"`

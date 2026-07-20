@@ -690,14 +690,15 @@ func (q *Queries) CreateInviteToken(ctx context.Context, arg CreateInviteTokenPa
 }
 
 const createInvoice = `-- name: CreateInvoice :one
-INSERT INTO invoices (org_id, student_id, enrollment_id, amount, due_date, period, note)
-VALUES ($1, $2, $3, $4, $5, $6, $7)
-RETURNING id, org_id, student_id, enrollment_id, amount, paid_amount, due_date, period, note, created_at
+INSERT INTO invoices (org_id, student_id, group_id, enrollment_id, amount, due_date, period, note)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+RETURNING id, org_id, student_id, group_id, enrollment_id, amount, paid_amount, due_date, period, note, created_at
 `
 
 type CreateInvoiceParams struct {
 	OrgID        uuid.UUID   `json:"org_id"`
 	StudentID    uuid.UUID   `json:"student_id"`
+	GroupID      pgtype.UUID `json:"group_id"`
 	EnrollmentID pgtype.UUID `json:"enrollment_id"`
 	Amount       int64       `json:"amount"`
 	DueDate      pgtype.Date `json:"due_date"`
@@ -709,6 +710,7 @@ func (q *Queries) CreateInvoice(ctx context.Context, arg CreateInvoiceParams) (I
 	row := q.db.QueryRow(ctx, createInvoice,
 		arg.OrgID,
 		arg.StudentID,
+		arg.GroupID,
 		arg.EnrollmentID,
 		arg.Amount,
 		arg.DueDate,
@@ -720,6 +722,7 @@ func (q *Queries) CreateInvoice(ctx context.Context, arg CreateInvoiceParams) (I
 		&i.ID,
 		&i.OrgID,
 		&i.StudentID,
+		&i.GroupID,
 		&i.EnrollmentID,
 		&i.Amount,
 		&i.PaidAmount,
@@ -1792,7 +1795,7 @@ func (q *Queries) GetInviteToken(ctx context.Context, token string) (InviteToken
 }
 
 const getInvoice = `-- name: GetInvoice :one
-SELECT id, org_id, student_id, enrollment_id, amount, paid_amount, due_date, period, note, created_at FROM invoices WHERE org_id = $1 AND id = $2
+SELECT id, org_id, student_id, group_id, enrollment_id, amount, paid_amount, due_date, period, note, created_at FROM invoices WHERE org_id = $1 AND id = $2
 `
 
 type GetInvoiceParams struct {
@@ -1807,6 +1810,7 @@ func (q *Queries) GetInvoice(ctx context.Context, arg GetInvoiceParams) (Invoice
 		&i.ID,
 		&i.OrgID,
 		&i.StudentID,
+		&i.GroupID,
 		&i.EnrollmentID,
 		&i.Amount,
 		&i.PaidAmount,
@@ -2079,10 +2083,15 @@ func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (User, error) {
 const groupFinanceByPeriod = `-- name: GroupFinanceByPeriod :many
 SELECT s.id AS student_id, s.name AS student_name,
        COALESCE(SUM(i.amount), 0)::bigint  AS invoiced,
-       COALESCE(SUM(i.paid_amount), 0)::bigint AS paid
+       COALESCE(SUM(i.paid_amount), 0)::bigint AS paid,
+       (
+         SELECT count(*) FROM attendance_records ar
+         WHERE ar.student_id = s.id AND ar.group_id = $1::uuid
+           AND to_char(ar.date, 'YYYY-MM') = $2::text AND ar.status <> 'absent'
+       )::bigint AS attended
 FROM students s
 JOIN group_members m ON m.student_id = s.id AND m.group_id = $1::uuid
-LEFT JOIN invoices i ON i.student_id = s.id AND i.period = $2::text
+LEFT JOIN invoices i ON i.student_id = s.id AND i.period = $2::text AND i.group_id = $1::uuid
 GROUP BY s.id, s.name
 ORDER BY s.name ASC
 `
@@ -2097,6 +2106,7 @@ type GroupFinanceByPeriodRow struct {
 	StudentName string    `json:"student_name"`
 	Invoiced    int64     `json:"invoiced"`
 	Paid        int64     `json:"paid"`
+	Attended    int64     `json:"attended"`
 }
 
 func (q *Queries) GroupFinanceByPeriod(ctx context.Context, arg GroupFinanceByPeriodParams) ([]GroupFinanceByPeriodRow, error) {
@@ -2113,6 +2123,7 @@ func (q *Queries) GroupFinanceByPeriod(ctx context.Context, arg GroupFinanceByPe
 			&i.StudentName,
 			&i.Invoiced,
 			&i.Paid,
+			&i.Attended,
 		); err != nil {
 			return nil, err
 		}
@@ -2834,7 +2845,7 @@ func (q *Queries) ListInterventionTasks(ctx context.Context) ([]ListIntervention
 }
 
 const listInvoicesByStudent = `-- name: ListInvoicesByStudent :many
-SELECT id, org_id, student_id, enrollment_id, amount, paid_amount, due_date, period, note, created_at FROM invoices WHERE student_id = $1 ORDER BY due_date DESC NULLS LAST, created_at DESC
+SELECT id, org_id, student_id, group_id, enrollment_id, amount, paid_amount, due_date, period, note, created_at FROM invoices WHERE student_id = $1 ORDER BY due_date DESC NULLS LAST, created_at DESC
 `
 
 func (q *Queries) ListInvoicesByStudent(ctx context.Context, studentID uuid.UUID) ([]Invoice, error) {
@@ -2850,6 +2861,7 @@ func (q *Queries) ListInvoicesByStudent(ctx context.Context, studentID uuid.UUID
 			&i.ID,
 			&i.OrgID,
 			&i.StudentID,
+			&i.GroupID,
 			&i.EnrollmentID,
 			&i.Amount,
 			&i.PaidAmount,

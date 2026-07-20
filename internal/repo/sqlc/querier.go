@@ -12,6 +12,7 @@ import (
 )
 
 type Querier interface {
+	AddGroupMember(ctx context.Context, arg AddGroupMemberParams) error
 	AdjustInvoicePaid(ctx context.Context, arg AdjustInvoicePaidParams) error
 	// Sets group_id AND denormalizes group_name to the group's name (or '' when unassigning), so the
 	// legacy group_name field stays in sync — the student list + dashboard read group_name.
@@ -24,7 +25,7 @@ type Querier interface {
 	CountRoomConflicts(ctx context.Context, arg CountRoomConflictsParams) (int64, error)
 	// --- dashboard aggregates (RLS-scoped: run inside WithTenant) ---
 	CountStudentsByTier(ctx context.Context) ([]CountStudentsByTierRow, error)
-	CountStudentsInGroup(ctx context.Context, groupID pgtype.UUID) (int64, error)
+	CountStudentsInGroup(ctx context.Context, groupID uuid.UUID) (int64, error)
 	// RLS-scoped: run inside WithTenant(org).
 	CountStudentsInOrg(ctx context.Context) (int64, error)
 	CountTeacherActiveStudents(ctx context.Context, dollar_1 uuid.UUID) (int64, error)
@@ -127,6 +128,7 @@ type Querier interface {
 	ListExpenses(ctx context.Context, arg ListExpensesParams) ([]Expense, error)
 	ListGroups(ctx context.Context) ([]Group, error)
 	ListGroupsByTeacher(ctx context.Context, teacherID pgtype.UUID) ([]Group, error)
+	ListGroupsForStudent(ctx context.Context, studentID uuid.UUID) ([]Group, error)
 	ListHomeworkByStudent(ctx context.Context, studentID uuid.UUID) ([]HomeworkRecord, error)
 	ListInterventionTasks(ctx context.Context) ([]ListInterventionTasksRow, error)
 	ListInvoicesByStudent(ctx context.Context, studentID uuid.UUID) ([]Invoice, error)
@@ -142,6 +144,7 @@ type Querier interface {
 	ListSignupRequests(ctx context.Context) ([]SignupRequest, error)
 	ListStudents(ctx context.Context) ([]Student, error)
 	ListStudentsByGroup(ctx context.Context, groupID pgtype.UUID) ([]Student, error)
+	ListStudentsInGroup(ctx context.Context, groupID uuid.UUID) ([]Student, error)
 	ListSurveysByStudent(ctx context.Context, studentID uuid.UUID) ([]Survey, error)
 	ListUsers(ctx context.Context) ([]User, error)
 	ListUsersByRole(ctx context.Context, role string) ([]User, error)
@@ -150,6 +153,7 @@ type Querier interface {
 	MarkLeadConverted(ctx context.Context, arg MarkLeadConvertedParams) error
 	MarkSalarySlipPaid(ctx context.Context, id uuid.UUID) (SalarySlip, error)
 	NullGroupForStudents(ctx context.Context, groupID pgtype.UUID) error
+	RemoveGroupMember(ctx context.Context, arg RemoveGroupMemberParams) error
 	ResolveInterventionTask(ctx context.Context, arg ResolveInterventionTaskParams) (InterventionTask, error)
 	RevokeAllUserSessions(ctx context.Context, userID uuid.UUID) error
 	RevokeRefreshSession(ctx context.Context, id uuid.UUID) error

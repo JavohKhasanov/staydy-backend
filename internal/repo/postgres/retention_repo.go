@@ -51,7 +51,7 @@ func (r *RetentionRepository) SubmitSurvey(ctx context.Context, orgID, studentID
 	return mapSurvey(survey), nil
 }
 
-func (r *RetentionRepository) RecordAttendance(ctx context.Context, orgID, studentID uuid.UUID, date time.Time, status string, fn repo.Recompute) (entity.AttendanceRecord, error) {
+func (r *RetentionRepository) RecordAttendance(ctx context.Context, orgID, studentID uuid.UUID, groupID *uuid.UUID, date time.Time, status string, fn repo.Recompute) (entity.AttendanceRecord, error) {
 	var rec sqlc.AttendanceRecord
 	err := r.db.WithTenant(ctx, orgID.String(), func(tx pgx.Tx) error {
 		q := sqlc.New(tx)
@@ -59,6 +59,7 @@ func (r *RetentionRepository) RecordAttendance(ctx context.Context, orgID, stude
 		rec, e = q.CreateAttendance(ctx, sqlc.CreateAttendanceParams{
 			OrgID:     orgID,
 			StudentID: studentID,
+			GroupID:   nullableUUID(groupID),
 			Date:      pgtype.Date{Time: date, Valid: true},
 			IsPresent: entity.PresentFromStatus(status), // risk-facing signal: only 'absent' is not present
 			Status:    status,

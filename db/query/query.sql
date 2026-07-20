@@ -188,21 +188,40 @@ RETURNING *;
 -- name: DeleteGroup :exec
 DELETE FROM groups WHERE id = $1;
 
+-- name: AddGroupMember :exec
+INSERT INTO group_members (org_id, group_id, student_id)
+VALUES ($1, $2, $3) ON CONFLICT DO NOTHING;
+
+-- name: RemoveGroupMember :exec
+DELETE FROM group_members WHERE group_id = $1 AND student_id = $2;
+
+-- name: ListGroupsForStudent :many
+SELECT g.* FROM groups g
+JOIN group_members m ON m.group_id = g.id
+WHERE m.student_id = $1
+ORDER BY g.name ASC;
+
+-- name: ListStudentsInGroup :many
+SELECT s.* FROM students s
+JOIN group_members m ON m.student_id = s.id
+WHERE m.group_id = $1
+ORDER BY s.risk_score DESC, s.name ASC;
+
 -- name: GroupsMissingAttendance :many
 -- Groups that meet on the given weekday but have NO attendance record for the date
 -- (and have at least one student). Powers the "davomat qilinmagan" dashboard alert.
 SELECT g.* FROM groups g
 WHERE g.schedule_days LIKE '%' || sqlc.arg(day_code)::text || '%'
-  AND EXISTS (SELECT 1 FROM students s WHERE s.group_id = g.id)
+  AND EXISTS (SELECT 1 FROM group_members m WHERE m.group_id = g.id)
   AND NOT EXISTS (
     SELECT 1 FROM attendance_records ar
-    JOIN students s2 ON s2.id = ar.student_id
-    WHERE s2.group_id = g.id AND ar.date = sqlc.arg(date)::date
+    JOIN group_members m2 ON m2.student_id = ar.student_id AND m2.group_id = g.id
+    WHERE ar.date = sqlc.arg(date)::date
   )
 ORDER BY g.start_time ASC;
 
 -- name: CountStudentsInGroup :one
-SELECT count(*) FROM students WHERE group_id = $1;
+SELECT count(*) FROM group_members WHERE group_id = $1;
 
 -- --- students + notes (RLS-scoped: run inside WithTenant; no WHERE org_id) ---
 
@@ -290,9 +309,9 @@ WHERE student_id = $1
 ORDER BY week_number DESC, submitted_at DESC;
 
 -- name: CreateAttendance :one
-INSERT INTO attendance_records (org_id, student_id, date, is_present, status)
-VALUES ($1, $2, $3, $4, $5)
-ON CONFLICT (org_id, student_id, date) DO UPDATE SET is_present = EXCLUDED.is_present, status = EXCLUDED.status
+INSERT INTO attendance_records (org_id, student_id, group_id, date, is_present, status)
+VALUES ($1, $2, $3, $4, $5, $6)
+ON CONFLICT (org_id, student_id, date, group_id) DO UPDATE SET is_present = EXCLUDED.is_present, status = EXCLUDED.status
 RETURNING *;
 
 -- name: ListAttendanceByStudent :many
@@ -485,8 +504,8 @@ SELECT s.id AS student_id, s.name AS student_name,
        COALESCE(SUM(i.amount), 0)::bigint  AS invoiced,
        COALESCE(SUM(i.paid_amount), 0)::bigint AS paid
 FROM students s
+JOIN group_members m ON m.student_id = s.id AND m.group_id = @group_id::uuid
 LEFT JOIN invoices i ON i.student_id = s.id AND i.period = @period::text
-WHERE s.group_id = @group_id::uuid
 GROUP BY s.id, s.name
 ORDER BY s.name ASC;
 

@@ -12,6 +12,22 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const addGroupMember = `-- name: AddGroupMember :exec
+INSERT INTO group_members (org_id, group_id, student_id)
+VALUES ($1, $2, $3) ON CONFLICT DO NOTHING
+`
+
+type AddGroupMemberParams struct {
+	OrgID     uuid.UUID `json:"org_id"`
+	GroupID   uuid.UUID `json:"group_id"`
+	StudentID uuid.UUID `json:"student_id"`
+}
+
+func (q *Queries) AddGroupMember(ctx context.Context, arg AddGroupMemberParams) error {
+	_, err := q.db.Exec(ctx, addGroupMember, arg.OrgID, arg.GroupID, arg.StudentID)
+	return err
+}
+
 const adjustInvoicePaid = `-- name: AdjustInvoicePaid :exec
 UPDATE invoices SET paid_amount = GREATEST(paid_amount + $3, 0) WHERE org_id = $1 AND id = $2
 `
@@ -187,10 +203,10 @@ func (q *Queries) CountStudentsByTier(ctx context.Context) ([]CountStudentsByTie
 }
 
 const countStudentsInGroup = `-- name: CountStudentsInGroup :one
-SELECT count(*) FROM students WHERE group_id = $1
+SELECT count(*) FROM group_members WHERE group_id = $1
 `
 
-func (q *Queries) CountStudentsInGroup(ctx context.Context, groupID pgtype.UUID) (int64, error) {
+func (q *Queries) CountStudentsInGroup(ctx context.Context, groupID uuid.UUID) (int64, error) {
 	row := q.db.QueryRow(ctx, countStudentsInGroup, groupID)
 	var count int64
 	err := row.Scan(&count)
@@ -314,15 +330,16 @@ func (q *Queries) CreateAdviceFeedback(ctx context.Context, arg CreateAdviceFeed
 }
 
 const createAttendance = `-- name: CreateAttendance :one
-INSERT INTO attendance_records (org_id, student_id, date, is_present, status)
-VALUES ($1, $2, $3, $4, $5)
-ON CONFLICT (org_id, student_id, date) DO UPDATE SET is_present = EXCLUDED.is_present, status = EXCLUDED.status
-RETURNING id, org_id, student_id, date, is_present, status, created_at
+INSERT INTO attendance_records (org_id, student_id, group_id, date, is_present, status)
+VALUES ($1, $2, $3, $4, $5, $6)
+ON CONFLICT (org_id, student_id, date, group_id) DO UPDATE SET is_present = EXCLUDED.is_present, status = EXCLUDED.status
+RETURNING id, org_id, student_id, group_id, date, is_present, status, created_at
 `
 
 type CreateAttendanceParams struct {
 	OrgID     uuid.UUID   `json:"org_id"`
 	StudentID uuid.UUID   `json:"student_id"`
+	GroupID   pgtype.UUID `json:"group_id"`
 	Date      pgtype.Date `json:"date"`
 	IsPresent bool        `json:"is_present"`
 	Status    string      `json:"status"`
@@ -332,6 +349,7 @@ func (q *Queries) CreateAttendance(ctx context.Context, arg CreateAttendancePara
 	row := q.db.QueryRow(ctx, createAttendance,
 		arg.OrgID,
 		arg.StudentID,
+		arg.GroupID,
 		arg.Date,
 		arg.IsPresent,
 		arg.Status,
@@ -341,6 +359,7 @@ func (q *Queries) CreateAttendance(ctx context.Context, arg CreateAttendancePara
 		&i.ID,
 		&i.OrgID,
 		&i.StudentID,
+		&i.GroupID,
 		&i.Date,
 		&i.IsPresent,
 		&i.Status,
@@ -2062,15 +2081,15 @@ SELECT s.id AS student_id, s.name AS student_name,
        COALESCE(SUM(i.amount), 0)::bigint  AS invoiced,
        COALESCE(SUM(i.paid_amount), 0)::bigint AS paid
 FROM students s
-LEFT JOIN invoices i ON i.student_id = s.id AND i.period = $1::text
-WHERE s.group_id = $2::uuid
+JOIN group_members m ON m.student_id = s.id AND m.group_id = $1::uuid
+LEFT JOIN invoices i ON i.student_id = s.id AND i.period = $2::text
 GROUP BY s.id, s.name
 ORDER BY s.name ASC
 `
 
 type GroupFinanceByPeriodParams struct {
-	Period  string    `json:"period"`
 	GroupID uuid.UUID `json:"group_id"`
+	Period  string    `json:"period"`
 }
 
 type GroupFinanceByPeriodRow struct {
@@ -2081,7 +2100,7 @@ type GroupFinanceByPeriodRow struct {
 }
 
 func (q *Queries) GroupFinanceByPeriod(ctx context.Context, arg GroupFinanceByPeriodParams) ([]GroupFinanceByPeriodRow, error) {
-	rows, err := q.db.Query(ctx, groupFinanceByPeriod, arg.Period, arg.GroupID)
+	rows, err := q.db.Query(ctx, groupFinanceByPeriod, arg.GroupID, arg.Period)
 	if err != nil {
 		return nil, err
 	}
@@ -2108,11 +2127,11 @@ func (q *Queries) GroupFinanceByPeriod(ctx context.Context, arg GroupFinanceByPe
 const groupsMissingAttendance = `-- name: GroupsMissingAttendance :many
 SELECT g.id, g.org_id, g.name, g.teacher_id, g.course_id, g.branch_id, g.direction, g.schedule_days, g.capacity, g.start_date, g.end_date, g.created_at, g.updated_at, g.start_time, g.end_time, g.room_id FROM groups g
 WHERE g.schedule_days LIKE '%' || $1::text || '%'
-  AND EXISTS (SELECT 1 FROM students s WHERE s.group_id = g.id)
+  AND EXISTS (SELECT 1 FROM group_members m WHERE m.group_id = g.id)
   AND NOT EXISTS (
     SELECT 1 FROM attendance_records ar
-    JOIN students s2 ON s2.id = ar.student_id
-    WHERE s2.group_id = g.id AND ar.date = $2::date
+    JOIN group_members m2 ON m2.student_id = ar.student_id AND m2.group_id = g.id
+    WHERE ar.date = $2::date
   )
 ORDER BY g.start_time ASC
 `
@@ -2393,7 +2412,7 @@ func (q *Queries) ListAllPlans(ctx context.Context) ([]Plan, error) {
 }
 
 const listAttendanceByStudent = `-- name: ListAttendanceByStudent :many
-SELECT id, org_id, student_id, date, is_present, status, created_at FROM attendance_records
+SELECT id, org_id, student_id, group_id, date, is_present, status, created_at FROM attendance_records
 WHERE student_id = $1
 ORDER BY date ASC
 `
@@ -2411,6 +2430,7 @@ func (q *Queries) ListAttendanceByStudent(ctx context.Context, studentID uuid.UU
 			&i.ID,
 			&i.OrgID,
 			&i.StudentID,
+			&i.GroupID,
 			&i.Date,
 			&i.IsPresent,
 			&i.Status,
@@ -2652,6 +2672,50 @@ SELECT id, org_id, name, teacher_id, course_id, branch_id, direction, schedule_d
 
 func (q *Queries) ListGroupsByTeacher(ctx context.Context, teacherID pgtype.UUID) ([]Group, error) {
 	rows, err := q.db.Query(ctx, listGroupsByTeacher, teacherID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Group{}
+	for rows.Next() {
+		var i Group
+		if err := rows.Scan(
+			&i.ID,
+			&i.OrgID,
+			&i.Name,
+			&i.TeacherID,
+			&i.CourseID,
+			&i.BranchID,
+			&i.Direction,
+			&i.ScheduleDays,
+			&i.Capacity,
+			&i.StartDate,
+			&i.EndDate,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.StartTime,
+			&i.EndTime,
+			&i.RoomID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listGroupsForStudent = `-- name: ListGroupsForStudent :many
+SELECT g.id, g.org_id, g.name, g.teacher_id, g.course_id, g.branch_id, g.direction, g.schedule_days, g.capacity, g.start_date, g.end_date, g.created_at, g.updated_at, g.start_time, g.end_time, g.room_id FROM groups g
+JOIN group_members m ON m.group_id = g.id
+WHERE m.student_id = $1
+ORDER BY g.name ASC
+`
+
+func (q *Queries) ListGroupsForStudent(ctx context.Context, studentID uuid.UUID) ([]Group, error) {
+	rows, err := q.db.Query(ctx, listGroupsForStudent, studentID)
 	if err != nil {
 		return nil, err
 	}
@@ -3259,6 +3323,64 @@ func (q *Queries) ListStudentsByGroup(ctx context.Context, groupID pgtype.UUID) 
 	return items, nil
 }
 
+const listStudentsInGroup = `-- name: ListStudentsInGroup :many
+SELECT s.id, s.org_id, s.name, s.phone, s.telegram_id, s.telegram_chat_id, s.course_name, s.group_name, s.group_id, s.mentor_name, s.start_date, s.onboarding_goal, s.six_month_target, s.weekly_study_hours, s.confidence_level, s.risk_score, s.risk_tier, s.email, s.birth_date, s.gender, s.second_phone, s.address, s.parent_name, s.parent_phone, s.student_code, s.status, s.mentor_id, s.branch_id, s.created_at, s.updated_at FROM students s
+JOIN group_members m ON m.student_id = s.id
+WHERE m.group_id = $1
+ORDER BY s.risk_score DESC, s.name ASC
+`
+
+func (q *Queries) ListStudentsInGroup(ctx context.Context, groupID uuid.UUID) ([]Student, error) {
+	rows, err := q.db.Query(ctx, listStudentsInGroup, groupID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Student{}
+	for rows.Next() {
+		var i Student
+		if err := rows.Scan(
+			&i.ID,
+			&i.OrgID,
+			&i.Name,
+			&i.Phone,
+			&i.TelegramID,
+			&i.TelegramChatID,
+			&i.CourseName,
+			&i.GroupName,
+			&i.GroupID,
+			&i.MentorName,
+			&i.StartDate,
+			&i.OnboardingGoal,
+			&i.SixMonthTarget,
+			&i.WeeklyStudyHours,
+			&i.ConfidenceLevel,
+			&i.RiskScore,
+			&i.RiskTier,
+			&i.Email,
+			&i.BirthDate,
+			&i.Gender,
+			&i.SecondPhone,
+			&i.Address,
+			&i.ParentName,
+			&i.ParentPhone,
+			&i.StudentCode,
+			&i.Status,
+			&i.MentorID,
+			&i.BranchID,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listSurveysByStudent = `-- name: ListSurveysByStudent :many
 SELECT id, org_id, student_id, week_number, motivation_score, progress_score, biggest_obstacle, comment, submitted_at FROM surveys
 WHERE student_id = $1
@@ -3444,6 +3566,20 @@ UPDATE students SET group_id = NULL, updated_at = now() WHERE group_id = $1
 
 func (q *Queries) NullGroupForStudents(ctx context.Context, groupID pgtype.UUID) error {
 	_, err := q.db.Exec(ctx, nullGroupForStudents, groupID)
+	return err
+}
+
+const removeGroupMember = `-- name: RemoveGroupMember :exec
+DELETE FROM group_members WHERE group_id = $1 AND student_id = $2
+`
+
+type RemoveGroupMemberParams struct {
+	GroupID   uuid.UUID `json:"group_id"`
+	StudentID uuid.UUID `json:"student_id"`
+}
+
+func (q *Queries) RemoveGroupMember(ctx context.Context, arg RemoveGroupMemberParams) error {
+	_, err := q.db.Exec(ctx, removeGroupMember, arg.GroupID, arg.StudentID)
 	return err
 }
 

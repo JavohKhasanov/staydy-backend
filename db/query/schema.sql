@@ -118,6 +118,18 @@ CREATE TABLE groups (
 CREATE INDEX idx_groups_org ON groups(org_id);
 CREATE INDEX idx_groups_teacher ON groups(teacher_id);
 
+-- Many-to-many student<->group membership (students.group_id = primary group, legacy).
+CREATE TABLE group_members (
+    id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    org_id     uuid NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    group_id   uuid NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
+    student_id uuid NOT NULL, -- FK to students added below (students defined later)
+    created_at timestamptz NOT NULL DEFAULT now(),
+    UNIQUE (group_id, student_id)
+);
+CREATE INDEX idx_group_members_group ON group_members(group_id);
+CREATE INDEX idx_group_members_student ON group_members(student_id);
+
 CREATE TABLE students (
     id                 uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     org_id             uuid NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
@@ -164,12 +176,13 @@ CREATE TABLE attendance_records (
     id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     org_id     uuid NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
     student_id uuid NOT NULL,
+    group_id   uuid, -- which group's session (nullable; legacy rows NULL)
     date       date NOT NULL,
     is_present boolean NOT NULL,
     status     text NOT NULL DEFAULT 'present', -- present|absent|late|excused; is_present = status<>'absent'
     created_at timestamptz NOT NULL DEFAULT now(),
     FOREIGN KEY (org_id, student_id) REFERENCES students (org_id, id) ON DELETE CASCADE,
-    UNIQUE (org_id, student_id, date) -- one attendance row per lesson date (upsert on re-record)
+    UNIQUE NULLS NOT DISTINCT (org_id, student_id, date, group_id) -- one row per date per group (upsert)
 );
 CREATE INDEX idx_attendance_student ON attendance_records(student_id);
 
@@ -486,6 +499,8 @@ ALTER TABLE homework_records    FORCE ROW LEVEL SECURITY;
 ALTER TABLE surveys             FORCE ROW LEVEL SECURITY;
 ALTER TABLE notes               FORCE ROW LEVEL SECURITY;
 ALTER TABLE intervention_tasks  FORCE ROW LEVEL SECURITY;
+ALTER TABLE group_members ENABLE ROW LEVEL SECURITY;
+ALTER TABLE group_members FORCE ROW LEVEL SECURITY;
 
 CREATE POLICY org_isolation ON users
     USING (org_id = nullif(current_setting('app.current_org', true), '')::uuid);
@@ -494,6 +509,8 @@ CREATE POLICY org_isolation ON groups
 CREATE POLICY org_isolation ON students
     USING (org_id = nullif(current_setting('app.current_org', true), '')::uuid);
 CREATE POLICY org_isolation ON homework_records
+    USING (org_id = nullif(current_setting('app.current_org', true), '')::uuid);
+CREATE POLICY org_isolation ON group_members
     USING (org_id = nullif(current_setting('app.current_org', true), '')::uuid);
 CREATE POLICY org_isolation ON attendance_records
     USING (org_id = nullif(current_setting('app.current_org', true), '')::uuid);

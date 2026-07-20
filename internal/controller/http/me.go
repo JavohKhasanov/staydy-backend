@@ -85,7 +85,11 @@ func registerMe(api huma.API, groups *groupusecase.Service, students *studentuse
 		if perr != nil {
 			return nil, huma.Error422UnprocessableEntity("date must be YYYY-MM-DD")
 		}
-		rec, err := students.RecordAttendance(ctx, p.OrgID, sid, date, attendanceStatus(in.Body))
+		gid, gerr := parseOptUUID(in.Body.GroupID)
+		if gerr != nil {
+			return nil, huma.Error422UnprocessableEntity("invalid groupId")
+		}
+		rec, err := students.RecordAttendance(ctx, p.OrgID, sid, gid, date, attendanceStatus(in.Body))
 		if err != nil {
 			return nil, mapStudentError(LangFromContext(ctx), err, log)
 		}

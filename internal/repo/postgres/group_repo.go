@@ -147,7 +147,7 @@ func (r *GroupRepository) CountStudents(ctx context.Context, orgID, id uuid.UUID
 	var n int64
 	err := r.db.WithTenant(ctx, orgID.String(), func(tx pgx.Tx) error {
 		var e error
-		n, e = sqlc.New(tx).CountStudentsInGroup(ctx, uuidPtr(id))
+		n, e = sqlc.New(tx).CountStudentsInGroup(ctx, id)
 		return e
 	})
 	return n, err
@@ -161,6 +161,46 @@ func (r *GroupRepository) MissingAttendance(ctx context.Context, orgID uuid.UUID
 			DayCode: dayCode,
 			Date:    dateVal(&date),
 		})
+		return e
+	})
+	if err != nil {
+		return nil, err
+	}
+	out := make([]entity.Group, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, mapGroup(row))
+	}
+	return out, nil
+}
+
+func (r *GroupRepository) AddMember(ctx context.Context, orgID, groupID, studentID uuid.UUID) error {
+	err := r.db.WithTenant(ctx, orgID.String(), func(tx pgx.Tx) error {
+		return sqlc.New(tx).AddGroupMember(ctx, sqlc.AddGroupMemberParams{
+			OrgID:     orgID,
+			GroupID:   groupID,
+			StudentID: studentID,
+		})
+	})
+	if isForeignKeyViolation(err) {
+		return repo.ErrNotFound
+	}
+	return err
+}
+
+func (r *GroupRepository) RemoveMember(ctx context.Context, orgID, groupID, studentID uuid.UUID) error {
+	return r.db.WithTenant(ctx, orgID.String(), func(tx pgx.Tx) error {
+		return sqlc.New(tx).RemoveGroupMember(ctx, sqlc.RemoveGroupMemberParams{
+			GroupID:   groupID,
+			StudentID: studentID,
+		})
+	})
+}
+
+func (r *GroupRepository) ListForStudent(ctx context.Context, orgID, studentID uuid.UUID) ([]entity.Group, error) {
+	var rows []sqlc.Group
+	err := r.db.WithTenant(ctx, orgID.String(), func(tx pgx.Tx) error {
+		var e error
+		rows, e = sqlc.New(tx).ListGroupsForStudent(ctx, studentID)
 		return e
 	})
 	if err != nil {

@@ -22,13 +22,14 @@ func NewAttendanceRepository(db *postgres.DB) *AttendanceRepository {
 	return &AttendanceRepository{db: db}
 }
 
-func (r *AttendanceRepository) Create(ctx context.Context, orgID, studentID uuid.UUID, date time.Time, present bool) (entity.AttendanceRecord, error) {
+func (r *AttendanceRepository) Create(ctx context.Context, orgID, studentID uuid.UUID, groupID *uuid.UUID, date time.Time, present bool) (entity.AttendanceRecord, error) {
 	var row sqlc.AttendanceRecord
 	err := r.db.WithTenant(ctx, orgID.String(), func(tx pgx.Tx) error {
 		var e error
 		row, e = sqlc.New(tx).CreateAttendance(ctx, sqlc.CreateAttendanceParams{
 			OrgID:     orgID,
 			StudentID: studentID,
+			GroupID:   nullableUUID(groupID),
 			Date:      pgtype.Date{Time: date, Valid: true},
 			IsPresent: present,
 		})

@@ -62,7 +62,7 @@ func (stubSurveys) ListByStudent(context.Context, uuid.UUID, uuid.UUID) ([]entit
 
 type stubAttendance struct{}
 
-func (stubAttendance) Create(context.Context, uuid.UUID, uuid.UUID, time.Time, bool) (entity.AttendanceRecord, error) {
+func (stubAttendance) Create(context.Context, uuid.UUID, uuid.UUID, *uuid.UUID, time.Time, bool) (entity.AttendanceRecord, error) {
 	return entity.AttendanceRecord{}, nil
 }
 func (stubAttendance) ListByStudent(context.Context, uuid.UUID, uuid.UUID) ([]entity.AttendanceRecord, error) {
@@ -83,7 +83,7 @@ type stubRetention struct{}
 func (stubRetention) SubmitSurvey(_ context.Context, _, sid uuid.UUID, p repo.CreateSurveyParams, _ repo.Recompute) (entity.Survey, error) {
 	return entity.Survey{ID: uuid.New(), StudentID: sid, WeekNumber: p.WeekNumber, MotivationScore: p.MotivationScore, ProgressScore: p.ProgressScore}, nil
 }
-func (stubRetention) RecordAttendance(_ context.Context, _, _ uuid.UUID, date time.Time, status string, _ repo.Recompute) (entity.AttendanceRecord, error) {
+func (stubRetention) RecordAttendance(_ context.Context, _, _ uuid.UUID, _ *uuid.UUID, date time.Time, status string, _ repo.Recompute) (entity.AttendanceRecord, error) {
 	return entity.AttendanceRecord{ID: uuid.New(), Date: date, IsPresent: entity.PresentFromStatus(status), Status: status}, nil
 }
 func (stubRetention) RecordHomework(_ context.Context, _, _ uuid.UUID, date time.Time, done bool, _ repo.Recompute) (entity.HomeworkRecord, error) {

@@ -193,7 +193,7 @@ func (r *StudentRepository) ListByGroup(ctx context.Context, orgID, groupID uuid
 	var rows []sqlc.Student
 	err := r.db.WithTenant(ctx, orgID.String(), func(tx pgx.Tx) error {
 		var e error
-		rows, e = sqlc.New(tx).ListStudentsByGroup(ctx, uuidPtr(groupID))
+		rows, e = sqlc.New(tx).ListStudentsInGroup(ctx, groupID)
 		return e
 	})
 	if err != nil {

@@ -166,6 +166,10 @@ type GroupRepository interface {
 	CountStudents(ctx context.Context, orgID, id uuid.UUID) (int64, error)
 	// MissingAttendance lists groups meeting on dayCode ("mon") with no attendance for date.
 	MissingAttendance(ctx context.Context, orgID uuid.UUID, dayCode string, date time.Time) ([]entity.Group, error)
+	// Membership (a student can study in several groups at once).
+	AddMember(ctx context.Context, orgID, groupID, studentID uuid.UUID) error
+	RemoveMember(ctx context.Context, orgID, groupID, studentID uuid.UUID) error
+	ListForStudent(ctx context.Context, orgID, studentID uuid.UUID) ([]entity.Group, error)
 }
 
 // TeacherRepository manages teacher accounts (users with role 'teacher'), RLS-scoped.
@@ -197,7 +201,7 @@ type SurveyRepository interface {
 
 // AttendanceRepository persists + reads attendance records (RLS-scoped).
 type AttendanceRepository interface {
-	Create(ctx context.Context, orgID, studentID uuid.UUID, date time.Time, present bool) (entity.AttendanceRecord, error)
+	Create(ctx context.Context, orgID, studentID uuid.UUID, groupID *uuid.UUID, date time.Time, present bool) (entity.AttendanceRecord, error)
 	ListByStudent(ctx context.Context, orgID, studentID uuid.UUID) ([]entity.AttendanceRecord, error)
 }
 
@@ -233,7 +237,7 @@ type Recompute func(st entity.Student, attendance []entity.AttendanceRecord, sur
 // user's data and the derived risk state can never diverge on partial failure.
 type RetentionRepository interface {
 	SubmitSurvey(ctx context.Context, orgID, studentID uuid.UUID, p CreateSurveyParams, fn Recompute) (entity.Survey, error)
-	RecordAttendance(ctx context.Context, orgID, studentID uuid.UUID, date time.Time, status string, fn Recompute) (entity.AttendanceRecord, error)
+	RecordAttendance(ctx context.Context, orgID, studentID uuid.UUID, groupID *uuid.UUID, date time.Time, status string, fn Recompute) (entity.AttendanceRecord, error)
 	RecordHomework(ctx context.Context, orgID, studentID uuid.UUID, date time.Time, done bool, fn Recompute) (entity.HomeworkRecord, error)
 	// RecordAdviceFeedback upserts a mentor's useful/not-useful rating of a student's AI advice
 	// (one per mentor per student). It performs no risk recompute.

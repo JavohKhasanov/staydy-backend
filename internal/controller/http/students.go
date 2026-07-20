@@ -119,8 +119,9 @@ type submitSurveyRequest struct {
 }
 
 type recordAttendanceRequest struct {
-	Date   string `json:"date" format:"date" minLength:"10" doc:"YYYY-MM-DD"`
-	Status string `json:"status,omitempty" enum:"present,absent,late,excused" doc:"attendance status (default present)"`
+	Date    string `json:"date" format:"date" minLength:"10" doc:"YYYY-MM-DD"`
+	GroupID string `json:"groupId,omitempty" format:"uuid" doc:"which group's session (multi-group students)"`
+	Status  string `json:"status,omitempty" enum:"present,absent,late,excused" doc:"attendance status (default present)"`
 	// IsPresent is the legacy boolean; kept for backward compatibility. Ignored when Status is set.
 	IsPresent *bool `json:"isPresent,omitempty"`
 }
@@ -459,7 +460,11 @@ func registerStudents(api huma.API, svc *studentusecase.Service, log zerolog.Log
 		if err != nil {
 			return nil, huma.Error422UnprocessableEntity("date must be YYYY-MM-DD")
 		}
-		rec, err := svc.RecordAttendance(ctx, p.OrgID, id, date, attendanceStatus(in.Body))
+		gid, gerr := parseOptUUID(in.Body.GroupID)
+		if gerr != nil {
+			return nil, huma.Error422UnprocessableEntity("invalid groupId")
+		}
+		rec, err := svc.RecordAttendance(ctx, p.OrgID, id, gid, date, attendanceStatus(in.Body))
 		if err != nil {
 			return nil, mapStudentError(LangFromContext(ctx), err, log)
 		}

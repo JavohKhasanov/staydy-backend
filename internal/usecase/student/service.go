@@ -323,11 +323,11 @@ func (s *Service) SubmitWeeklySurvey(ctx context.Context, orgID, studentID uuid.
 // RecordAttendance records one lesson's attendance (status: present|absent|late|excused) and
 // recomputes risk atomically. is_present is derived from status in the repo, so the risk engine is
 // unaffected by the new granularity (late/excused count as attended).
-func (s *Service) RecordAttendance(ctx context.Context, orgID, studentID uuid.UUID, date time.Time, status string) (entity.AttendanceRecord, error) {
+func (s *Service) RecordAttendance(ctx context.Context, orgID, studentID uuid.UUID, groupID *uuid.UUID, date time.Time, status string) (entity.AttendanceRecord, error) {
 	if !entity.ValidAttendanceStatus(status) {
 		return entity.AttendanceRecord{}, ErrValidation
 	}
-	rec, err := s.retention.RecordAttendance(ctx, orgID, studentID, date, status, s.outcome)
+	rec, err := s.retention.RecordAttendance(ctx, orgID, studentID, groupID, date, status, s.outcome)
 	if err != nil {
 		if errors.Is(err, repo.ErrNotFound) {
 			return entity.AttendanceRecord{}, ErrNotFound
@@ -434,7 +434,7 @@ func (s *Service) ImportRecords(ctx context.Context, orgID uuid.UUID, rows []Imp
 			if !*row.Present {
 				status = entity.AttendanceAbsent
 			}
-			if _, err := s.RecordAttendance(ctx, orgID, st.ID, row.Date, status); err != nil {
+			if _, err := s.RecordAttendance(ctx, orgID, st.ID, nil, row.Date, status); err != nil {
 				res.Skipped = append(res.Skipped, SkippedRow{Name: name, Reason: "davomat saqlanmadi"})
 				continue
 			}

@@ -33,6 +33,7 @@ type AttendanceRecord struct {
 	ID        uuid.UUID          `json:"id"`
 	OrgID     uuid.UUID          `json:"org_id"`
 	StudentID uuid.UUID          `json:"student_id"`
+	GroupID   pgtype.UUID        `json:"group_id"`
 	Date      pgtype.Date        `json:"date"`
 	IsPresent bool               `json:"is_present"`
 	Status    string             `json:"status"`
@@ -115,6 +116,14 @@ type Group struct {
 	StartTime    string             `json:"start_time"`
 	EndTime      string             `json:"end_time"`
 	RoomID       pgtype.UUID        `json:"room_id"`
+}
+
+type GroupMember struct {
+	ID        uuid.UUID          `json:"id"`
+	OrgID     uuid.UUID          `json:"org_id"`
+	GroupID   uuid.UUID          `json:"group_id"`
+	StudentID uuid.UUID          `json:"student_id"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
 }
 
 type HomeworkRecord struct {

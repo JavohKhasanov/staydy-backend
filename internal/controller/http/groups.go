@@ -55,6 +55,11 @@ type missingAttendanceInput struct {
 	Date string `query:"date" doc:"YYYY-MM-DD (default: today)"`
 }
 
+type memberInput struct {
+	ID        string `path:"id" format:"uuid"`
+	StudentID string `path:"studentId" format:"uuid"`
+}
+
 type groupIDInput struct {
 	ID string `path:"id" format:"uuid"`
 }
@@ -259,6 +264,81 @@ func registerGroups(api huma.API, svc *groupusecase.Service, log zerolog.Logger)
 			date = d
 		}
 		list, err := svc.MissingAttendance(ctx, p.OrgID, date)
+		if err != nil {
+			return nil, mapGroupError(LangFromContext(ctx), err, log)
+		}
+		out := &listGroupsOutput{Body: make([]groupResponse, 0, len(list))}
+		for _, g := range list {
+			out.Body = append(out.Body, toGroupResponse(g))
+		}
+		return out, nil
+	})
+
+	Register(api, BearerOperation(huma.Operation{
+		OperationID:   "groups-add-member",
+		Method:        http.MethodPost,
+		Path:          "/groups/{id}/students/{studentId}",
+		Summary:       "Add a student to a group (multi-group membership; primary untouched)",
+		Tags:          []string{"groups"},
+		DefaultStatus: http.StatusNoContent,
+		Errors:        []int{http.StatusUnprocessableEntity, http.StatusNotFound, http.StatusForbidden, http.StatusInternalServerError},
+	}), func(ctx context.Context, in *memberInput) (*noContentOutput, error) {
+		p, err := principal(ctx)
+		if err != nil {
+			return nil, err
+		}
+		gid, gerr := uuid.Parse(in.ID)
+		sid, serr := uuid.Parse(in.StudentID)
+		if gerr != nil || serr != nil {
+			return nil, huma.Error422UnprocessableEntity("invalid id")
+		}
+		if err := svc.AddMember(ctx, p.OrgID, gid, sid); err != nil {
+			return nil, mapGroupError(LangFromContext(ctx), err, log)
+		}
+		return &noContentOutput{}, nil
+	})
+
+	Register(api, BearerOperation(huma.Operation{
+		OperationID:   "groups-remove-member",
+		Method:        http.MethodDelete,
+		Path:          "/groups/{id}/students/{studentId}",
+		Summary:       "Remove a student from a group (primary falls back to another membership)",
+		Tags:          []string{"groups"},
+		DefaultStatus: http.StatusNoContent,
+		Errors:        []int{http.StatusUnprocessableEntity, http.StatusNotFound, http.StatusForbidden, http.StatusInternalServerError},
+	}), func(ctx context.Context, in *memberInput) (*noContentOutput, error) {
+		p, err := principal(ctx)
+		if err != nil {
+			return nil, err
+		}
+		gid, gerr := uuid.Parse(in.ID)
+		sid, serr := uuid.Parse(in.StudentID)
+		if gerr != nil || serr != nil {
+			return nil, huma.Error422UnprocessableEntity("invalid id")
+		}
+		if err := svc.RemoveMember(ctx, p.OrgID, gid, sid); err != nil {
+			return nil, mapGroupError(LangFromContext(ctx), err, log)
+		}
+		return &noContentOutput{}, nil
+	})
+
+	Register(api, BearerOperation(huma.Operation{
+		OperationID: "students-groups",
+		Method:      http.MethodGet,
+		Path:        "/students/{id}/groups",
+		Summary:     "Every group the student is a member of",
+		Tags:        []string{"groups"},
+		Errors:      []int{http.StatusUnprocessableEntity, http.StatusForbidden, http.StatusInternalServerError},
+	}), func(ctx context.Context, in *groupIDInput) (*listGroupsOutput, error) {
+		p, err := principal(ctx)
+		if err != nil {
+			return nil, err
+		}
+		sid, serr := uuid.Parse(in.ID)
+		if serr != nil {
+			return nil, huma.Error422UnprocessableEntity("invalid student id")
+		}
+		list, err := svc.StudentGroups(ctx, p.OrgID, sid)
 		if err != nil {
 			return nil, mapGroupError(LangFromContext(ctx), err, log)
 		}

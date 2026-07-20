@@ -140,7 +140,63 @@ func (s *Service) AssignStudent(ctx context.Context, orgID, studentID uuid.UUID,
 			return err
 		}
 	}
-	return s.students.AssignGroup(ctx, orgID, studentID, groupID)
+	if err := s.students.AssignGroup(ctx, orgID, studentID, groupID); err != nil {
+		return err
+	}
+	// Primary assignment also creates a membership (multi-group source of truth).
+	if groupID != nil {
+		return s.groups.AddMember(ctx, orgID, *groupID, studentID)
+	}
+	return nil
+}
+
+// AddMember puts a student into a group WITHOUT touching their primary group — a student can
+// study in several groups (courses) at once. Sets the primary when they had none.
+func (s *Service) AddMember(ctx context.Context, orgID, groupID, studentID uuid.UUID) error {
+	st, err := s.students.GetByID(ctx, orgID, studentID)
+	if err != nil {
+		return err
+	}
+	if _, err := s.groups.GetByID(ctx, orgID, groupID); err != nil {
+		return err
+	}
+	if err := s.groups.AddMember(ctx, orgID, groupID, studentID); err != nil {
+		return err
+	}
+	if st.GroupID == nil {
+		gid := groupID
+		return s.students.AssignGroup(ctx, orgID, studentID, &gid)
+	}
+	return nil
+}
+
+// RemoveMember takes a student out of one group. If it was their primary group, the primary
+// moves to another remaining membership (or clears).
+func (s *Service) RemoveMember(ctx context.Context, orgID, groupID, studentID uuid.UUID) error {
+	st, err := s.students.GetByID(ctx, orgID, studentID)
+	if err != nil {
+		return err
+	}
+	if err := s.groups.RemoveMember(ctx, orgID, groupID, studentID); err != nil {
+		return err
+	}
+	if st.GroupID != nil && *st.GroupID == groupID {
+		rest, lerr := s.groups.ListForStudent(ctx, orgID, studentID)
+		if lerr != nil {
+			return lerr
+		}
+		var next *uuid.UUID
+		if len(rest) > 0 {
+			next = &rest[0].ID
+		}
+		return s.students.AssignGroup(ctx, orgID, studentID, next)
+	}
+	return nil
+}
+
+// StudentGroups lists every group a student is a member of.
+func (s *Service) StudentGroups(ctx context.Context, orgID, studentID uuid.UUID) ([]entity.Group, error) {
+	return s.groups.ListForStudent(ctx, orgID, studentID)
 }
 
 // MyGroups returns the groups owned by a teacher (their own dashboard).
@@ -169,21 +225,16 @@ func (s *Service) MyStudents(ctx context.Context, orgID, teacherID uuid.UUID) ([
 // OwnsStudent reports whether a student belongs to one of the teacher's own groups. Used to gate
 // a teacher's attendance/homework marking to their own students.
 func (s *Service) OwnsStudent(ctx context.Context, orgID, teacherID, studentID uuid.UUID) (bool, error) {
-	st, err := s.students.GetByID(ctx, orgID, studentID)
+	groups, err := s.groups.ListForStudent(ctx, orgID, studentID)
 	if err != nil {
 		return false, err
 	}
-	if st.GroupID == nil {
-		return false, nil
-	}
-	g, err := s.groups.GetByID(ctx, orgID, *st.GroupID)
-	if err != nil {
-		if errors.Is(err, repo.ErrNotFound) {
-			return false, nil
+	for _, g := range groups {
+		if g.TeacherID != nil && *g.TeacherID == teacherID {
+			return true, nil
 		}
-		return false, err
 	}
-	return g.TeacherID != nil && *g.TeacherID == teacherID, nil
+	return false, nil
 }
 
 // validateTeacher ensures an assigned teacher_id (if any) is a teacher in this tenant.

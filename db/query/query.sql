@@ -457,9 +457,9 @@ GROUP BY category
 ORDER BY total DESC;
 
 -- name: UpsertSalaryRule :one
-INSERT INTO salary_rules (org_id, teacher_id, kind, rate)
-VALUES ($1, $2, $3, $4)
-ON CONFLICT (org_id, teacher_id) DO UPDATE SET kind = EXCLUDED.kind, rate = EXCLUDED.rate, updated_at = now()
+INSERT INTO salary_rules (org_id, teacher_id, kind, rate, base_amount)
+VALUES ($1, $2, $3, $4, $5)
+ON CONFLICT (org_id, teacher_id) DO UPDATE SET kind = EXCLUDED.kind, rate = EXCLUDED.rate, base_amount = EXCLUDED.base_amount, updated_at = now()
 RETURNING *;
 
 -- name: GetSalaryRule :one

@@ -27,6 +27,7 @@ type SalaryRule struct {
 	TeacherID uuid.UUID
 	Kind      string
 	Rate      int64
+	Base      int64
 }
 
 // SalarySlip is one period's pay for a teacher (gross ± bonus/deduction = net).
@@ -51,22 +52,24 @@ type SalarySlip struct {
 type SalaryBasis struct {
 	Kind     string
 	Rate     int64
+	Base     int64
 	Lessons  int64
 	Students int64
 	Revenue  int64
 	Gross    int64
 }
 
-// ComputeGross derives gross pay from a rule's kind/rate and the period's basis counts.
-func ComputeGross(kind string, rate, lessons, students, revenue int64) int64 {
+// ComputeGross = fixed base + a variable component derived from the rule's kind/rate and the
+// period's basis counts. A pure-fixed teacher has base>0 and kind 'fixed' (no variable).
+func ComputeGross(kind string, base, rate, lessons, students, revenue int64) int64 {
+	variable := int64(0)
 	switch kind {
 	case SalaryPerLesson:
-		return rate * lessons
+		variable = rate * lessons
 	case SalaryPerStudent:
-		return rate * students
+		variable = rate * students
 	case SalaryPercentRevenue:
-		return revenue * rate / 100
-	default: // fixed
-		return rate
+		variable = revenue * rate / 100
 	}
+	return base + variable
 }

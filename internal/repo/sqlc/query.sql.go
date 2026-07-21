@@ -1988,7 +1988,7 @@ func (q *Queries) GetRefreshSessionByHash(ctx context.Context, tokenHash string)
 }
 
 const getSalaryRule = `-- name: GetSalaryRule :one
-SELECT id, org_id, teacher_id, kind, rate, created_at, updated_at FROM salary_rules WHERE teacher_id = $1
+SELECT id, org_id, teacher_id, kind, rate, base_amount, created_at, updated_at FROM salary_rules WHERE teacher_id = $1
 `
 
 func (q *Queries) GetSalaryRule(ctx context.Context, teacherID uuid.UUID) (SalaryRule, error) {
@@ -2000,6 +2000,7 @@ func (q *Queries) GetSalaryRule(ctx context.Context, teacherID uuid.UUID) (Salar
 		&i.TeacherID,
 		&i.Kind,
 		&i.Rate,
+		&i.BaseAmount,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -4653,17 +4654,18 @@ func (q *Queries) UpdateUserProfile(ctx context.Context, arg UpdateUserProfilePa
 }
 
 const upsertSalaryRule = `-- name: UpsertSalaryRule :one
-INSERT INTO salary_rules (org_id, teacher_id, kind, rate)
-VALUES ($1, $2, $3, $4)
-ON CONFLICT (org_id, teacher_id) DO UPDATE SET kind = EXCLUDED.kind, rate = EXCLUDED.rate, updated_at = now()
-RETURNING id, org_id, teacher_id, kind, rate, created_at, updated_at
+INSERT INTO salary_rules (org_id, teacher_id, kind, rate, base_amount)
+VALUES ($1, $2, $3, $4, $5)
+ON CONFLICT (org_id, teacher_id) DO UPDATE SET kind = EXCLUDED.kind, rate = EXCLUDED.rate, base_amount = EXCLUDED.base_amount, updated_at = now()
+RETURNING id, org_id, teacher_id, kind, rate, base_amount, created_at, updated_at
 `
 
 type UpsertSalaryRuleParams struct {
-	OrgID     uuid.UUID `json:"org_id"`
-	TeacherID uuid.UUID `json:"teacher_id"`
-	Kind      string    `json:"kind"`
-	Rate      int64     `json:"rate"`
+	OrgID      uuid.UUID `json:"org_id"`
+	TeacherID  uuid.UUID `json:"teacher_id"`
+	Kind       string    `json:"kind"`
+	Rate       int64     `json:"rate"`
+	BaseAmount int64     `json:"base_amount"`
 }
 
 func (q *Queries) UpsertSalaryRule(ctx context.Context, arg UpsertSalaryRuleParams) (SalaryRule, error) {
@@ -4672,6 +4674,7 @@ func (q *Queries) UpsertSalaryRule(ctx context.Context, arg UpsertSalaryRulePara
 		arg.TeacherID,
 		arg.Kind,
 		arg.Rate,
+		arg.BaseAmount,
 	)
 	var i SalaryRule
 	err := row.Scan(
@@ -4680,6 +4683,7 @@ func (q *Queries) UpsertSalaryRule(ctx context.Context, arg UpsertSalaryRulePara
 		&i.TeacherID,
 		&i.Kind,
 		&i.Rate,
+		&i.BaseAmount,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)

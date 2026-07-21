@@ -167,6 +167,7 @@ func mapSalaryRule(r sqlc.SalaryRule) entity.SalaryRule {
 		TeacherID: r.TeacherID,
 		Kind:      r.Kind,
 		Rate:      r.Rate,
+		Base:      r.BaseAmount,
 	}
 }
 

@@ -334,8 +334,9 @@ CREATE TABLE salary_rules (
     id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     org_id     uuid NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
     teacher_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    kind       text NOT NULL DEFAULT 'fixed', -- fixed | per_lesson | per_student | percent_revenue
-    rate       bigint NOT NULL DEFAULT 0,
+    kind       text NOT NULL DEFAULT 'fixed', -- variable part: fixed(none) | per_lesson | per_student | percent_revenue
+    rate       bigint NOT NULL DEFAULT 0,       -- variable rate (per lesson/student, or % for percent_revenue)
+    base_amount bigint NOT NULL DEFAULT 0,      -- fixed monthly base (added on top of the variable part)
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),
     UNIQUE (org_id, teacher_id)

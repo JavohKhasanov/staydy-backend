@@ -280,13 +280,14 @@ type Room struct {
 }
 
 type SalaryRule struct {
-	ID        uuid.UUID          `json:"id"`
-	OrgID     uuid.UUID          `json:"org_id"`
-	TeacherID uuid.UUID          `json:"teacher_id"`
-	Kind      string             `json:"kind"`
-	Rate      int64              `json:"rate"`
-	CreatedAt pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
+	ID         uuid.UUID          `json:"id"`
+	OrgID      uuid.UUID          `json:"org_id"`
+	TeacherID  uuid.UUID          `json:"teacher_id"`
+	Kind       string             `json:"kind"`
+	Rate       int64              `json:"rate"`
+	BaseAmount int64              `json:"base_amount"`
+	CreatedAt  pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt  pgtype.Timestamptz `json:"updated_at"`
 }
 
 type SalarySlip struct {

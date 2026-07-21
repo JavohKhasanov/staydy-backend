@@ -34,11 +34,11 @@ func (s *Service) GetRule(ctx context.Context, orgID, teacherID uuid.UUID) (enti
 	return rule, err
 }
 
-func (s *Service) SetRule(ctx context.Context, orgID, teacherID uuid.UUID, kind string, rate int64) (entity.SalaryRule, error) {
+func (s *Service) SetRule(ctx context.Context, orgID, teacherID uuid.UUID, kind string, rate, base int64) (entity.SalaryRule, error) {
 	if !entity.ValidSalaryKind(kind) || rate < 0 {
 		return entity.SalaryRule{}, ErrValidation
 	}
-	rule, err := s.repo.SetRule(ctx, orgID, teacherID, kind, rate)
+	rule, err := s.repo.SetRule(ctx, orgID, teacherID, kind, rate, base)
 	if errors.Is(err, repo.ErrNotFound) {
 		return entity.SalaryRule{}, ErrNotFound
 	}
@@ -59,10 +59,11 @@ func (s *Service) Preview(ctx context.Context, orgID, teacherID uuid.UUID, from,
 	return entity.SalaryBasis{
 		Kind:     rule.Kind,
 		Rate:     rule.Rate,
+		Base:     rule.Base,
 		Lessons:  lessons,
 		Students: students,
 		Revenue:  revenue,
-		Gross:    entity.ComputeGross(rule.Kind, rule.Rate, lessons, students, revenue),
+		Gross:    entity.ComputeGross(rule.Kind, rule.Base, rule.Rate, lessons, students, revenue),
 	}, nil
 }
 

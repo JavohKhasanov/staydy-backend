@@ -1,4 +1,4 @@
-h1:i2D6E9/sMmAyTHMMwEgvlP+Tz9+68OYIRL2VxtdmMts=
+h1:KNopiQ32tj1MGLo8rvifYY7qM5vPsa7KUp4/ZXXZA2M=
 20260621001046_init.sql h1:0PhWfGa5YtpECqejoxFtDc/dcBRoWHrCZGvQsgwgQZs=
 20260621051500_rls.sql h1:nSxaAZOOpNLTyXoGdnHaVviu4TDnNKhAui7tiFTIYQc=
 20260621060000_composite_fks.sql h1:pk2z0agzhnRTMyfBI/4ULqb7tpnHNRIYXye4TvX65kI=
@@ -29,3 +29,4 @@ h1:i2D6E9/sMmAyTHMMwEgvlP+Tz9+68OYIRL2VxtdmMts=
 20260721100000_group_members.sql h1:00/gIAF1Po6k0ix7fzTo4eaZb+qLGzCCp9gLyJU2XeQ=
 20260721110000_invoice_group.sql h1:1tp5Avn6RPwJb0YU0btf+Qgd7TOOzCRydwdzzYCUNo8=
 20260721120000_grace_setting.sql h1:xxuVpbMkWr631vovOlAm2rBFchP+k9NWqyKmPDx2MB0=
+20260721130000_salary_base.sql h1:X7X8jmByNRnb0zwhpLGKOf4ktKTfnHEZAmKb25E0Ymo=

@@ -38,14 +38,15 @@ func (r *SalaryRepository) GetRule(ctx context.Context, orgID, teacherID uuid.UU
 	return rule, err
 }
 
-func (r *SalaryRepository) SetRule(ctx context.Context, orgID, teacherID uuid.UUID, kind string, rate int64) (entity.SalaryRule, error) {
+func (r *SalaryRepository) SetRule(ctx context.Context, orgID, teacherID uuid.UUID, kind string, rate, base int64) (entity.SalaryRule, error) {
 	var rule entity.SalaryRule
 	err := r.db.WithTenant(ctx, orgID.String(), func(tx pgx.Tx) error {
 		row, e := sqlc.New(tx).UpsertSalaryRule(ctx, sqlc.UpsertSalaryRuleParams{
-			OrgID:     orgID,
-			TeacherID: teacherID,
-			Kind:      kind,
-			Rate:      rate,
+			OrgID:      orgID,
+			TeacherID:  teacherID,
+			Kind:       kind,
+			Rate:       rate,
+			BaseAmount: base,
 		})
 		if e != nil {
 			return e

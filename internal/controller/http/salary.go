@@ -18,10 +18,12 @@ type salaryRuleResponse struct {
 	TeacherID string `json:"teacherId"`
 	Kind      string `json:"kind"`
 	Rate      int64  `json:"rate"`
+	Base      int64  `json:"base"`
 }
 type salaryBasisResponse struct {
 	Kind     string `json:"kind"`
 	Rate     int64  `json:"rate"`
+	Base     int64  `json:"base"`
 	Lessons  int64  `json:"lessons"`
 	Students int64  `json:"students"`
 	Revenue  int64  `json:"revenue"`
@@ -50,6 +52,7 @@ type setSalaryRuleInput struct {
 	Body struct {
 		Kind string `json:"kind" enum:"fixed,per_lesson,per_student,percent_revenue"`
 		Rate int64  `json:"rate" minimum:"0" doc:"so'm for fixed/per_lesson/per_student; percent(0-100) for percent_revenue"`
+		Base int64  `json:"base,omitempty" minimum:"0" doc:"fixed monthly base added on top of the variable part (hybrid)"`
 	}
 }
 type salaryPreviewInput struct {
@@ -110,7 +113,7 @@ func registerSalary(api huma.API, svc *salaryusecase.Service, log zerolog.Logger
 		if err != nil {
 			return nil, err
 		}
-		rule, err := svc.SetRule(ctx, p.OrgID, tid, in.Body.Kind, in.Body.Rate)
+		rule, err := svc.SetRule(ctx, p.OrgID, tid, in.Body.Kind, in.Body.Rate, in.Body.Base)
 		if err != nil {
 			return nil, mapSalaryError(err, log)
 		}
@@ -138,7 +141,7 @@ func registerSalary(api huma.API, svc *salaryusecase.Service, log zerolog.Logger
 			return nil, mapSalaryError(err, log)
 		}
 		return &salaryBasisOutput{Body: salaryBasisResponse{
-			Kind: b.Kind, Rate: b.Rate, Lessons: b.Lessons, Students: b.Students, Revenue: b.Revenue, Gross: b.Gross,
+			Kind: b.Kind, Rate: b.Rate, Base: b.Base, Lessons: b.Lessons, Students: b.Students, Revenue: b.Revenue, Gross: b.Gross,
 		}}, nil
 	})
 
@@ -247,7 +250,7 @@ func registerSalary(api huma.API, svc *salaryusecase.Service, log zerolog.Logger
 }
 
 func toSalaryRuleResponse(r entity.SalaryRule, teacherID uuid.UUID) salaryRuleResponse {
-	return salaryRuleResponse{TeacherID: teacherID.String(), Kind: r.Kind, Rate: r.Rate}
+	return salaryRuleResponse{TeacherID: teacherID.String(), Kind: r.Kind, Rate: r.Rate, Base: r.Base}
 }
 
 func toSalarySlipResponse(s entity.SalarySlip) salarySlipResponse {

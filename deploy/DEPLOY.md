@@ -87,7 +87,8 @@ curl -s https://api.staydy.uz/api/v1/health   # (yoki superadmin login)
 Brauzerda: `staydy.uz` (landing forma → superadmin "So'rovlar"), `app.staydy.uz`, `admin.staydy.uz`.
 
 ## 8. Xavfsizlik (birinchi kirishdan keyin)
-- **Superadmin parolini o'zgartiring** (seed: `xadminsup@gmail.com` / `@superpassw0rd$`).
+- **Superadmin parolini DARROV o'zgartiring.** Seed hisobi `xadminsup@gmail.com`, boshlang'ich parol migratsiya faylida ochiq turadi (`db/migrations/20260630130000_seed_superadmin.sql`) — shuning uchun uni birinchi kirishdayoq almashtiring. `admin.staydy.uz` panelida yon menyudagi **"Parolni o'zgartirish"** orqali (yoki `POST /api/v1/me/change-password`). Almashtirgach seeddagi qiymat ishlamay qoladi.
+- **DB backuplari** avtomatik: `backup` xizmati har kuni `pg_dump` qiladi (`./backups`, 14 kun saqlanadi). Haqiqiy falokatga qarshi backuplarni serverdan tashqariga (rsync/S3) ko'chirib turing.
 - Staydy portlari `172.17.0.1` da (docker gateway) — tashqi internetga ochiq emas, faqat NPM yetadi. Postgres umuman port ochmaydi.
 
 ---

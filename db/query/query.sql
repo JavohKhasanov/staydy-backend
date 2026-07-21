@@ -465,6 +465,33 @@ RETURNING *;
 -- name: GetSalaryRule :one
 SELECT * FROM salary_rules WHERE teacher_id = $1;
 
+-- name: ListSalaryGroupRules :many
+SELECT * FROM salary_group_rules WHERE teacher_id = $1::uuid;
+
+-- name: DeleteTeacherGroupRules :exec
+DELETE FROM salary_group_rules WHERE teacher_id = $1::uuid;
+
+-- name: InsertSalaryGroupRule :one
+INSERT INTO salary_group_rules (org_id, teacher_id, group_id, kind, rate)
+VALUES ($1, $2, $3, $4, $5)
+RETURNING *;
+
+-- name: TeacherGroupBasis :many
+-- Per-group basis for a teacher's groups: active members (via group_members), done lessons, and
+-- collected revenue in the period. Feeds the per-group salary computation.
+SELECT g.id AS group_id, g.name AS group_name,
+  (SELECT count(*) FROM group_members m JOIN students s ON s.id = m.student_id
+     WHERE m.group_id = g.id AND s.status = 'active')::bigint AS students,
+  (SELECT count(*) FROM lessons l
+     WHERE l.group_id = g.id AND l.status = 'done'
+       AND l.date >= $2::date AND l.date <= $3::date)::bigint AS lessons,
+  (SELECT COALESCE(SUM(p.amount), 0) FROM payments p JOIN invoices i ON i.id = p.invoice_id
+     WHERE i.group_id = g.id
+       AND p.paid_at::date >= $2::date AND p.paid_at::date <= $3::date)::bigint AS revenue
+FROM groups g
+WHERE g.teacher_id = $1::uuid
+ORDER BY g.name;
+
 -- name: CreateSalarySlip :one
 INSERT INTO salary_slips (org_id, teacher_id, period_start, period_end, gross, bonus, deduction, net, note)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)

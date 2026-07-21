@@ -421,11 +421,21 @@ type CreateExpenseParams struct {
 	Note     string
 }
 
+// GroupRuleParams is one per-group salary override to persist.
+type GroupRuleParams struct {
+	GroupID uuid.UUID
+	Kind    string
+	Rate    int64
+}
+
 // SalaryRepository manages teacher payroll (rules + slips) and computes a period's pay basis.
 type SalaryRepository interface {
 	GetRule(ctx context.Context, orgID, teacherID uuid.UUID) (entity.SalaryRule, error)
 	SetRule(ctx context.Context, orgID, teacherID uuid.UUID, kind string, rate, base int64) (entity.SalaryRule, error)
+	ListGroupRules(ctx context.Context, orgID, teacherID uuid.UUID) ([]entity.SalaryGroupRule, error)
+	ReplaceGroupRules(ctx context.Context, orgID, teacherID uuid.UUID, rules []GroupRuleParams) error
 	Basis(ctx context.Context, orgID, teacherID uuid.UUID, from, to time.Time) (lessons, students, revenue int64, err error)
+	GroupBasis(ctx context.Context, orgID, teacherID uuid.UUID, from, to time.Time) ([]entity.GroupBasis, error)
 	CreateSlip(ctx context.Context, orgID uuid.UUID, p SalarySlipParams) (entity.SalarySlip, error)
 	ListSlips(ctx context.Context, orgID uuid.UUID, from, to time.Time) ([]entity.SalarySlip, error)
 	MarkPaid(ctx context.Context, orgID, id uuid.UUID) (entity.SalarySlip, error)

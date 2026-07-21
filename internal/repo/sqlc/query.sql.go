@@ -1612,6 +1612,15 @@ func (q *Queries) DeleteTeacher(ctx context.Context, id uuid.UUID) error {
 	return err
 }
 
+const deleteTeacherGroupRules = `-- name: DeleteTeacherGroupRules :exec
+DELETE FROM salary_group_rules WHERE teacher_id = $1::uuid
+`
+
+func (q *Queries) DeleteTeacherGroupRules(ctx context.Context, dollar_1 uuid.UUID) error {
+	_, err := q.db.Exec(ctx, deleteTeacherGroupRules, dollar_1)
+	return err
+}
+
 const expensesByCategory = `-- name: ExpensesByCategory :many
 SELECT category, COALESCE(SUM(amount), 0)::bigint AS total
 FROM expenses
@@ -2315,6 +2324,42 @@ func (q *Queries) HighRiskStudents(ctx context.Context) ([]Student, error) {
 		return nil, err
 	}
 	return items, nil
+}
+
+const insertSalaryGroupRule = `-- name: InsertSalaryGroupRule :one
+INSERT INTO salary_group_rules (org_id, teacher_id, group_id, kind, rate)
+VALUES ($1, $2, $3, $4, $5)
+RETURNING id, org_id, teacher_id, group_id, kind, rate, created_at, updated_at
+`
+
+type InsertSalaryGroupRuleParams struct {
+	OrgID     uuid.UUID `json:"org_id"`
+	TeacherID uuid.UUID `json:"teacher_id"`
+	GroupID   uuid.UUID `json:"group_id"`
+	Kind      string    `json:"kind"`
+	Rate      int64     `json:"rate"`
+}
+
+func (q *Queries) InsertSalaryGroupRule(ctx context.Context, arg InsertSalaryGroupRuleParams) (SalaryGroupRule, error) {
+	row := q.db.QueryRow(ctx, insertSalaryGroupRule,
+		arg.OrgID,
+		arg.TeacherID,
+		arg.GroupID,
+		arg.Kind,
+		arg.Rate,
+	)
+	var i SalaryGroupRule
+	err := row.Scan(
+		&i.ID,
+		&i.OrgID,
+		&i.TeacherID,
+		&i.GroupID,
+		&i.Kind,
+		&i.Rate,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
 }
 
 const listActivePlans = `-- name: ListActivePlans :many
@@ -3194,6 +3239,39 @@ func (q *Queries) ListRooms(ctx context.Context, orgID uuid.UUID) ([]Room, error
 	return items, nil
 }
 
+const listSalaryGroupRules = `-- name: ListSalaryGroupRules :many
+SELECT id, org_id, teacher_id, group_id, kind, rate, created_at, updated_at FROM salary_group_rules WHERE teacher_id = $1::uuid
+`
+
+func (q *Queries) ListSalaryGroupRules(ctx context.Context, dollar_1 uuid.UUID) ([]SalaryGroupRule, error) {
+	rows, err := q.db.Query(ctx, listSalaryGroupRules, dollar_1)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []SalaryGroupRule{}
+	for rows.Next() {
+		var i SalaryGroupRule
+		if err := rows.Scan(
+			&i.ID,
+			&i.OrgID,
+			&i.TeacherID,
+			&i.GroupID,
+			&i.Kind,
+			&i.Rate,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listSalarySlips = `-- name: ListSalarySlips :many
 SELECT ss.id, ss.org_id, ss.teacher_id, ss.period_start, ss.period_end, ss.gross, ss.bonus, ss.deduction, ss.net, ss.status, ss.note, ss.paid_at, ss.created_at, u.full_name AS teacher_name
 FROM salary_slips ss
@@ -3927,6 +4005,63 @@ func (q *Queries) StudentBalance(ctx context.Context, studentID uuid.UUID) (int6
 	var balance int64
 	err := row.Scan(&balance)
 	return balance, err
+}
+
+const teacherGroupBasis = `-- name: TeacherGroupBasis :many
+SELECT g.id AS group_id, g.name AS group_name,
+  (SELECT count(*) FROM group_members m JOIN students s ON s.id = m.student_id
+     WHERE m.group_id = g.id AND s.status = 'active')::bigint AS students,
+  (SELECT count(*) FROM lessons l
+     WHERE l.group_id = g.id AND l.status = 'done'
+       AND l.date >= $2::date AND l.date <= $3::date)::bigint AS lessons,
+  (SELECT COALESCE(SUM(p.amount), 0) FROM payments p JOIN invoices i ON i.id = p.invoice_id
+     WHERE i.group_id = g.id
+       AND p.paid_at::date >= $2::date AND p.paid_at::date <= $3::date)::bigint AS revenue
+FROM groups g
+WHERE g.teacher_id = $1::uuid
+ORDER BY g.name
+`
+
+type TeacherGroupBasisParams struct {
+	Column1 uuid.UUID   `json:"column_1"`
+	Column2 pgtype.Date `json:"column_2"`
+	Column3 pgtype.Date `json:"column_3"`
+}
+
+type TeacherGroupBasisRow struct {
+	GroupID   uuid.UUID `json:"group_id"`
+	GroupName string    `json:"group_name"`
+	Students  int64     `json:"students"`
+	Lessons   int64     `json:"lessons"`
+	Revenue   int64     `json:"revenue"`
+}
+
+// Per-group basis for a teacher's groups: active members (via group_members), done lessons, and
+// collected revenue in the period. Feeds the per-group salary computation.
+func (q *Queries) TeacherGroupBasis(ctx context.Context, arg TeacherGroupBasisParams) ([]TeacherGroupBasisRow, error) {
+	rows, err := q.db.Query(ctx, teacherGroupBasis, arg.Column1, arg.Column2, arg.Column3)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []TeacherGroupBasisRow{}
+	for rows.Next() {
+		var i TeacherGroupBasisRow
+		if err := rows.Scan(
+			&i.GroupID,
+			&i.GroupName,
+			&i.Students,
+			&i.Lessons,
+			&i.Revenue,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const teacherRevenue = `-- name: TeacherRevenue :one

@@ -90,6 +90,7 @@ type Querier interface {
 	DeleteSalarySlip(ctx context.Context, id uuid.UUID) error
 	DeleteStudent(ctx context.Context, id uuid.UUID) error
 	DeleteTeacher(ctx context.Context, id uuid.UUID) error
+	DeleteTeacherGroupRules(ctx context.Context, dollar_1 uuid.UUID) error
 	ExpensesByCategory(ctx context.Context, arg ExpensesByCategoryParams) ([]ExpensesByCategoryRow, error)
 	FinanceSummary(ctx context.Context, dollar_1 uuid.UUID) (FinanceSummaryRow, error)
 	GetBotConversation(ctx context.Context, telegramChatID int64) (BotConversation, error)
@@ -117,6 +118,7 @@ type Querier interface {
 	// (and have at least one student). Powers the "davomat qilinmagan" dashboard alert.
 	GroupsMissingAttendance(ctx context.Context, arg GroupsMissingAttendanceParams) ([]Group, error)
 	HighRiskStudents(ctx context.Context) ([]Student, error)
+	InsertSalaryGroupRule(ctx context.Context, arg InsertSalaryGroupRuleParams) (SalaryGroupRule, error)
 	ListActivePlans(ctx context.Context) ([]Plan, error)
 	ListActivities(ctx context.Context, arg ListActivitiesParams) ([]Activity, error)
 	// NON-RLS: used by the cross-tenant scheduler to iterate every center.
@@ -144,6 +146,7 @@ type Querier interface {
 	ListObstacleOptions(ctx context.Context, orgID uuid.UUID) ([]ObstacleOption, error)
 	ListPaymentsByStudent(ctx context.Context, studentID uuid.UUID) ([]Payment, error)
 	ListRooms(ctx context.Context, orgID uuid.UUID) ([]Room, error)
+	ListSalaryGroupRules(ctx context.Context, dollar_1 uuid.UUID) ([]SalaryGroupRule, error)
 	ListSalarySlips(ctx context.Context, arg ListSalarySlipsParams) ([]ListSalarySlipsRow, error)
 	ListSignupRequests(ctx context.Context) ([]SignupRequest, error)
 	ListStudents(ctx context.Context) ([]Student, error)
@@ -171,6 +174,9 @@ type Querier interface {
 	SlugExists(ctx context.Context, slug string) (bool, error)
 	StartInterventionTask(ctx context.Context, id uuid.UUID) (InterventionTask, error)
 	StudentBalance(ctx context.Context, studentID uuid.UUID) (int64, error)
+	// Per-group basis for a teacher's groups: active members (via group_members), done lessons, and
+	// collected revenue in the period. Feeds the per-group salary computation.
+	TeacherGroupBasis(ctx context.Context, arg TeacherGroupBasisParams) ([]TeacherGroupBasisRow, error)
 	TeacherRevenue(ctx context.Context, arg TeacherRevenueParams) (int64, error)
 	TopObstacles(ctx context.Context) ([]TopObstaclesRow, error)
 	UpdateBranch(ctx context.Context, arg UpdateBranchParams) (Branch, error)

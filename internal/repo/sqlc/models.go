@@ -279,6 +279,17 @@ type Room struct {
 	CreatedAt pgtype.Timestamptz `json:"created_at"`
 }
 
+type SalaryGroupRule struct {
+	ID        uuid.UUID          `json:"id"`
+	OrgID     uuid.UUID          `json:"org_id"`
+	TeacherID uuid.UUID          `json:"teacher_id"`
+	GroupID   uuid.UUID          `json:"group_id"`
+	Kind      string             `json:"kind"`
+	Rate      int64              `json:"rate"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
+}
+
 type SalaryRule struct {
 	ID         uuid.UUID          `json:"id"`
 	OrgID      uuid.UUID          `json:"org_id"`

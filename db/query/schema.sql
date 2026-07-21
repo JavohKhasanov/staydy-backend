@@ -343,6 +343,21 @@ CREATE TABLE salary_rules (
 );
 CREATE INDEX idx_salary_rules_org ON salary_rules(org_id);
 
+-- Per-group salary overrides (a teacher's variable pay can differ per group/course). Absent a row,
+-- the group falls back to the teacher's default salary_rules kind/rate. Base stays teacher-level.
+CREATE TABLE salary_group_rules (
+    id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    org_id     uuid NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    teacher_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    group_id   uuid NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
+    kind       text NOT NULL DEFAULT 'per_student',
+    rate       bigint NOT NULL DEFAULT 0,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now(),
+    UNIQUE (org_id, teacher_id, group_id)
+);
+CREATE INDEX idx_salary_group_rules_teacher ON salary_group_rules(teacher_id);
+
 CREATE TABLE salary_slips (
     id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     org_id       uuid NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,

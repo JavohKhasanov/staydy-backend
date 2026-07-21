@@ -20,14 +20,26 @@ type salaryRuleResponse struct {
 	Rate      int64  `json:"rate"`
 	Base      int64  `json:"base"`
 }
+type salaryGroupBasisResponse struct {
+	GroupID   string `json:"groupId"`
+	GroupName string `json:"groupName"`
+	Kind      string `json:"kind"`
+	Rate      int64  `json:"rate"`
+	Override  bool   `json:"override"`
+	Students  int64  `json:"students"`
+	Lessons   int64  `json:"lessons"`
+	Revenue   int64  `json:"revenue"`
+	Amount    int64  `json:"amount"`
+}
 type salaryBasisResponse struct {
-	Kind     string `json:"kind"`
-	Rate     int64  `json:"rate"`
-	Base     int64  `json:"base"`
-	Lessons  int64  `json:"lessons"`
-	Students int64  `json:"students"`
-	Revenue  int64  `json:"revenue"`
-	Gross    int64  `json:"gross"`
+	Kind     string                     `json:"kind"`
+	Rate     int64                      `json:"rate"`
+	Base     int64                      `json:"base"`
+	Lessons  int64                      `json:"lessons"`
+	Students int64                      `json:"students"`
+	Revenue  int64                      `json:"revenue"`
+	Groups   []salaryGroupBasisResponse `json:"groups"`
+	Gross    int64                      `json:"gross"`
 }
 type salarySlipResponse struct {
 	ID          string  `json:"id"`
@@ -47,12 +59,18 @@ type salarySlipResponse struct {
 type teacherIDPathInput struct {
 	ID string `path:"id" format:"uuid"`
 }
+type salaryGroupRuleInput struct {
+	GroupID string `json:"groupId" format:"uuid"`
+	Kind    string `json:"kind" enum:"fixed,per_lesson,per_student,percent_revenue"`
+	Rate    int64  `json:"rate" minimum:"0"`
+}
 type setSalaryRuleInput struct {
 	ID   string `path:"id" format:"uuid"`
 	Body struct {
-		Kind string `json:"kind" enum:"fixed,per_lesson,per_student,percent_revenue"`
-		Rate int64  `json:"rate" minimum:"0" doc:"so'm for fixed/per_lesson/per_student; percent(0-100) for percent_revenue"`
-		Base int64  `json:"base,omitempty" minimum:"0" doc:"fixed monthly base added on top of the variable part (hybrid)"`
+		Kind   string                 `json:"kind" enum:"fixed,per_lesson,per_student,percent_revenue"`
+		Rate   int64                  `json:"rate" minimum:"0" doc:"so'm for fixed/per_lesson/per_student; percent(0-100) for percent_revenue"`
+		Base   int64                  `json:"base,omitempty" minimum:"0" doc:"fixed monthly base added on top of the variable part (hybrid)"`
+		Groups []salaryGroupRuleInput `json:"groups,omitempty" doc:"per-group overrides; replaces all existing overrides when present"`
 	}
 }
 type salaryPreviewInput struct {
@@ -113,7 +131,18 @@ func registerSalary(api huma.API, svc *salaryusecase.Service, log zerolog.Logger
 		if err != nil {
 			return nil, err
 		}
-		rule, err := svc.SetRule(ctx, p.OrgID, tid, in.Body.Kind, in.Body.Rate, in.Body.Base)
+		var groups []salaryusecase.GroupRuleInput
+		if in.Body.Groups != nil {
+			groups = make([]salaryusecase.GroupRuleInput, 0, len(in.Body.Groups))
+			for _, g := range in.Body.Groups {
+				gid, perr := uuid.Parse(g.GroupID)
+				if perr != nil {
+					return nil, huma.Error422UnprocessableEntity("invalid groupId")
+				}
+				groups = append(groups, salaryusecase.GroupRuleInput{GroupID: gid, Kind: g.Kind, Rate: g.Rate})
+			}
+		}
+		rule, err := svc.SetRule(ctx, p.OrgID, tid, in.Body.Kind, in.Body.Rate, in.Body.Base, groups)
 		if err != nil {
 			return nil, mapSalaryError(err, log)
 		}
@@ -140,8 +169,22 @@ func registerSalary(api huma.API, svc *salaryusecase.Service, log zerolog.Logger
 		if err != nil {
 			return nil, mapSalaryError(err, log)
 		}
+		groups := make([]salaryGroupBasisResponse, 0, len(b.Groups))
+		for _, g := range b.Groups {
+			groups = append(groups, salaryGroupBasisResponse{
+				GroupID:   g.GroupID.String(),
+				GroupName: g.GroupName,
+				Kind:      g.Kind,
+				Rate:      g.Rate,
+				Override:  g.Override,
+				Students:  g.Students,
+				Lessons:   g.Lessons,
+				Revenue:   g.Revenue,
+				Amount:    g.Amount,
+			})
+		}
 		return &salaryBasisOutput{Body: salaryBasisResponse{
-			Kind: b.Kind, Rate: b.Rate, Base: b.Base, Lessons: b.Lessons, Students: b.Students, Revenue: b.Revenue, Gross: b.Gross,
+			Kind: b.Kind, Rate: b.Rate, Base: b.Base, Lessons: b.Lessons, Students: b.Students, Revenue: b.Revenue, Groups: groups, Gross: b.Gross,
 		}}, nil
 	})
 

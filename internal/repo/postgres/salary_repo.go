@@ -63,6 +63,74 @@ func (r *SalaryRepository) SetRule(ctx context.Context, orgID, teacherID uuid.UU
 	return rule, nil
 }
 
+// ListGroupRules returns a teacher's per-group salary overrides.
+func (r *SalaryRepository) ListGroupRules(ctx context.Context, orgID, teacherID uuid.UUID) ([]entity.SalaryGroupRule, error) {
+	var out []entity.SalaryGroupRule
+	err := r.db.WithTenant(ctx, orgID.String(), func(tx pgx.Tx) error {
+		rows, e := sqlc.New(tx).ListSalaryGroupRules(ctx, teacherID)
+		if e != nil {
+			return e
+		}
+		out = make([]entity.SalaryGroupRule, 0, len(rows))
+		for _, row := range rows {
+			out = append(out, entity.SalaryGroupRule{
+				TeacherID: row.TeacherID, GroupID: row.GroupID, Kind: row.Kind, Rate: row.Rate,
+			})
+		}
+		return nil
+	})
+	return out, err
+}
+
+// ReplaceGroupRules atomically sets a teacher's per-group overrides to exactly rules (deleting any
+// not present). An empty slice clears all overrides.
+func (r *SalaryRepository) ReplaceGroupRules(ctx context.Context, orgID, teacherID uuid.UUID, rules []repo.GroupRuleParams) error {
+	return r.db.WithTenant(ctx, orgID.String(), func(tx pgx.Tx) error {
+		q := sqlc.New(tx)
+		if e := q.DeleteTeacherGroupRules(ctx, teacherID); e != nil {
+			return e
+		}
+		for _, gr := range rules {
+			if _, e := q.InsertSalaryGroupRule(ctx, sqlc.InsertSalaryGroupRuleParams{
+				OrgID:     orgID,
+				TeacherID: teacherID,
+				GroupID:   gr.GroupID,
+				Kind:      gr.Kind,
+				Rate:      gr.Rate,
+			}); e != nil {
+				return e
+			}
+		}
+		return nil
+	})
+}
+
+// GroupBasis returns the per-group counts (active members, done lessons, revenue) for a teacher's
+// groups in the period.
+func (r *SalaryRepository) GroupBasis(ctx context.Context, orgID, teacherID uuid.UUID, from, to time.Time) ([]entity.GroupBasis, error) {
+	var out []entity.GroupBasis
+	err := r.db.WithTenant(ctx, orgID.String(), func(tx pgx.Tx) error {
+		rows, e := sqlc.New(tx).TeacherGroupBasis(ctx, sqlc.TeacherGroupBasisParams{
+			Column1: teacherID, Column2: dateVal(&from), Column3: dateVal(&to),
+		})
+		if e != nil {
+			return e
+		}
+		out = make([]entity.GroupBasis, 0, len(rows))
+		for _, row := range rows {
+			out = append(out, entity.GroupBasis{
+				GroupID:   row.GroupID,
+				GroupName: row.GroupName,
+				Students:  row.Students,
+				Lessons:   row.Lessons,
+				Revenue:   row.Revenue,
+			})
+		}
+		return nil
+	})
+	return out, err
+}
+
 // Basis computes the period's done-lesson count, active-student count, and revenue for a teacher.
 func (r *SalaryRepository) Basis(ctx context.Context, orgID, teacherID uuid.UUID, from, to time.Time) (lessons, students, revenue int64, err error) {
 	err = r.db.WithTenant(ctx, orgID.String(), func(tx pgx.Tx) error {

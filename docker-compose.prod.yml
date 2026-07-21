@@ -88,5 +88,29 @@ services:
       - "172.17.0.1:3012:3000"
     restart: unless-stopped
 
+  # Automated database backups: a compressed pg_dump on start and then daily, kept 14 days, written
+  # to ./backups on the host (outside the pgdata volume). Restore with:
+  #   gunzip -c backups/ssp-YYYYmmdd-HHMMSS.sql.gz | docker compose -f docker-compose.prod.yml exec -T postgres psql -U ssp -d ssp
+  # NOTE: these live on the same server as the DB — copy them off-box (rsync/S3) for real disaster
+  # recovery. The dump uses the .tmp→rename trick so a partial file is never picked up as a backup.
+  backup:
+    image: postgres:16-alpine
+    env_file: .env
+    volumes:
+      - ./backups:/backups
+    command: >
+      sh -c 'echo "backup service: initial dump then daily, 14-day retention";
+      while true; do
+      ts=$$(date +%Y%m%d-%H%M%S);
+      if PGPASSWORD="$$DB_PASSWORD" pg_dump -h postgres -U ssp -d ssp | gzip > /backups/ssp-$$ts.sql.gz.tmp;
+      then mv /backups/ssp-$$ts.sql.gz.tmp /backups/ssp-$$ts.sql.gz; echo "backup ok ssp-$$ts.sql.gz";
+      else echo "backup FAILED $$ts"; rm -f /backups/ssp-$$ts.sql.gz.tmp; fi;
+      find /backups -name "ssp-*.sql.gz" -mtime +14 -delete;
+      sleep 86400; done'
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
 volumes:
   pgdata:

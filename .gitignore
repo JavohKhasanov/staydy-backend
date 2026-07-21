@@ -5,3 +5,6 @@
 
 # prod secrets (keep .env.prod.example tracked)
 .env.prod
+
+# Local DB dumps from the backup service
+backups/

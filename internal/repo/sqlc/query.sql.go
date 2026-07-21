@@ -1647,7 +1647,7 @@ func (q *Queries) DeleteSalarySlip(ctx context.Context, id uuid.UUID) error {
 }
 
 const deleteStaffUser = `-- name: DeleteStaffUser :exec
-DELETE FROM users WHERE id = $1 AND role IN ('center_admin', 'finance')
+DELETE FROM users WHERE id = $1 AND role IN ('center_admin', 'manager', 'finance')
 `
 
 func (q *Queries) DeleteStaffUser(ctx context.Context, id uuid.UUID) error {
@@ -3440,7 +3440,7 @@ func (q *Queries) ListSignupRequests(ctx context.Context) ([]SignupRequest, erro
 }
 
 const listStaffUsers = `-- name: ListStaffUsers :many
-SELECT id, org_id, email, password_hash, full_name, role, phone, is_active, branch_id, created_at, updated_at FROM users WHERE role IN ('center_admin', 'finance') ORDER BY full_name ASC
+SELECT id, org_id, email, password_hash, full_name, role, phone, is_active, branch_id, created_at, updated_at FROM users WHERE role IN ('center_admin', 'manager', 'finance') ORDER BY full_name ASC
 `
 
 func (q *Queries) ListStaffUsers(ctx context.Context) ([]User, error) {
@@ -4704,7 +4704,7 @@ func (q *Queries) UpdateSignupRequestStatus(ctx context.Context, arg UpdateSignu
 
 const updateStaffUser = `-- name: UpdateStaffUser :one
 UPDATE users SET full_name = $2, email = $3, role = $4, updated_at = now()
-WHERE id = $1 AND role IN ('center_admin', 'finance') RETURNING id, org_id, email, password_hash, full_name, role, phone, is_active, branch_id, created_at, updated_at
+WHERE id = $1 AND role IN ('center_admin', 'manager', 'finance') RETURNING id, org_id, email, password_hash, full_name, role, phone, is_active, branch_id, created_at, updated_at
 `
 
 type UpdateStaffUserParams struct {

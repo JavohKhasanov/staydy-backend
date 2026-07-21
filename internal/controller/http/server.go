@@ -122,33 +122,51 @@ func NewServer(deps Dependencies) *Server {
 	registerTelegram(protectedAPI, deps.Bot, deps.Logger)
 	registerAccount(protectedAPI, deps.Auth, deps.Logger) // self-service change-password (any role)
 
-	// Finance panel: finance + salary + reports data, open to the finance role as well as
-	// center_admin / super_admin. Read-only teacher/group lists also mount here so the finance
-	// pages can render debtor/salary/report context without full org-management access.
+	// Sensitive money — center profit/expense summary, the expense ledger, and teacher salaries.
+	// Director (center_admin) + finance only; the front-desk administrator never sees these.
 	financeAPI := huma.NewGroup(api, "/api/v1")
 	financeAPI.UseMiddleware(RequireAuth(api, deps.TokenManager))
 	financeAPI.UseMiddleware(RequireRole(api, entity.RoleFinance, entity.RoleCenterAdmin, entity.RoleSuperAdmin))
-	registerFinance(financeAPI, deps.Finance, deps.Logger)
 	registerSalary(financeAPI, deps.Salary, deps.Logger)
 
-	// Org-structure management (groups + teachers) is restricted to center_admin / super_admin.
-	// The read-only list endpoints are handed financeAPI so finance can read them too.
-	centerAdminAPI := huma.NewGroup(api, "/api/v1")
-	centerAdminAPI.UseMiddleware(RequireAuth(api, deps.TokenManager))
-	centerAdminAPI.UseMiddleware(RequireRole(api, entity.RoleCenterAdmin, entity.RoleSuperAdmin))
-	registerGroups(centerAdminAPI, financeAPI, deps.Groups, deps.Logger)
-	registerTeachers(centerAdminAPI, financeAPI, deps.Teachers, deps.Logger)
-	registerStaff(centerAdminAPI, deps.Staff, deps.Logger)
-	registerObstacleOptions(centerAdminAPI, deps.Obstacles, deps.Logger)
-	registerCourses(centerAdminAPI, deps.Courses, deps.Logger)
-	registerEnrollments(centerAdminAPI, deps.Enrollments, deps.Logger)
-	registerBranches(centerAdminAPI, deps.Branches, deps.Logger)
-	registerRooms(centerAdminAPI, deps.Rooms, deps.Logger)
-	registerLeads(centerAdminAPI, deps.Leads, deps.Students, deps.Logger)
-	registerActivities(centerAdminAPI, deps.Activities, deps.Logger)
-	registerLessons(centerAdminAPI, deps.Lessons, deps.Logger)
-	registerMaintenance(centerAdminAPI, deps.Students, deps.Logger)
-	registerImport(centerAdminAPI, deps.Students, deps.Logger)
+	// Operational payments — student balances, invoices, collecting fees, debtors, the group fee
+	// roster, payment alerts, billing settings. The front-desk administrator (manager) collects
+	// payments too, alongside director + finance. registerFinance keeps the sensitive summary +
+	// expense endpoints on financeAPI (passed as its second arg).
+	paymentsAPI := huma.NewGroup(api, "/api/v1")
+	paymentsAPI.UseMiddleware(RequireAuth(api, deps.TokenManager))
+	paymentsAPI.UseMiddleware(RequireRole(api, entity.RoleManager, entity.RoleFinance, entity.RoleCenterAdmin, entity.RoleSuperAdmin))
+	registerFinance(paymentsAPI, financeAPI, deps.Finance, deps.Logger)
+
+	// Read-only teacher/group lists — needed by finance and the administrator for debtor/salary/
+	// report context, without granting org-structure mutation rights.
+	staffReadAPI := huma.NewGroup(api, "/api/v1")
+	staffReadAPI.UseMiddleware(RequireAuth(api, deps.TokenManager))
+	staffReadAPI.UseMiddleware(RequireRole(api, entity.RoleManager, entity.RoleFinance, entity.RoleCenterAdmin, entity.RoleSuperAdmin))
+
+	// Operational center management (groups, courses, schedule, attendance, teachers, rooms,
+	// settings). Director + administrator(manager); NOT finance (money-only).
+	centerStaffAPI := huma.NewGroup(api, "/api/v1")
+	centerStaffAPI.UseMiddleware(RequireAuth(api, deps.TokenManager))
+	centerStaffAPI.UseMiddleware(RequireRole(api, entity.RoleManager, entity.RoleCenterAdmin, entity.RoleSuperAdmin))
+	registerGroups(centerStaffAPI, staffReadAPI, deps.Groups, deps.Logger)
+	registerTeachers(centerStaffAPI, staffReadAPI, deps.Teachers, deps.Logger)
+	registerObstacleOptions(centerStaffAPI, deps.Obstacles, deps.Logger)
+	registerCourses(centerStaffAPI, deps.Courses, deps.Logger)
+	registerEnrollments(centerStaffAPI, deps.Enrollments, deps.Logger)
+	registerBranches(centerStaffAPI, deps.Branches, deps.Logger)
+	registerRooms(centerStaffAPI, deps.Rooms, deps.Logger)
+	registerLeads(centerStaffAPI, deps.Leads, deps.Students, deps.Logger)
+	registerActivities(centerStaffAPI, deps.Activities, deps.Logger)
+	registerLessons(centerStaffAPI, deps.Lessons, deps.Logger)
+	registerMaintenance(centerStaffAPI, deps.Students, deps.Logger)
+	registerImport(centerStaffAPI, deps.Students, deps.Logger)
+
+	// Director-only: staff account management (create/manage administrators, finance, co-directors).
+	directorAPI := huma.NewGroup(api, "/api/v1")
+	directorAPI.UseMiddleware(RequireAuth(api, deps.TokenManager))
+	directorAPI.UseMiddleware(RequireRole(api, entity.RoleCenterAdmin, entity.RoleSuperAdmin))
+	registerStaff(directorAPI, deps.Staff, deps.Logger)
 
 	// The signed-in teacher's own dashboard (their groups/students + scoped marking).
 	teacherAPI := huma.NewGroup(api, "/api/v1")

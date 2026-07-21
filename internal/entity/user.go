@@ -11,16 +11,18 @@ type UserRole string
 
 const (
 	RoleSuperAdmin  UserRole = "super_admin"  // platform owner
-	RoleCenterAdmin UserRole = "center_admin" // educational-center administrator (full center panel)
-	RoleFinance     UserRole = "finance"      // moliya: finance + salary + reports only
+	RoleCenterAdmin UserRole = "center_admin" // direktor (center owner): full center panel
+	RoleManager     UserRole = "manager"      // administrator (front-desk): operations + collect payments, no salaries/expenses/staff
+	RoleFinance     UserRole = "finance"      // moliya: finance + salary + reports
 	RoleMentor      UserRole = "mentor"       // mentor within a center (resolves intervention tasks)
 	RoleTeacher     UserRole = "teacher"      // ustoz: owns groups, marks attendance/homework
 )
 
-// ValidStaffRole reports whether r is a role a center admin may assign to a staff account it
-// creates (administrator or finance — not teacher, which has its own path, nor the platform owner).
+// ValidStaffRole reports whether r is a role a director may assign to a staff account it creates:
+// another director, an administrator (manager), or finance. Teachers have their own path; the
+// platform owner is out of scope.
 func ValidStaffRole(r UserRole) bool {
-	return r == RoleCenterAdmin || r == RoleFinance
+	return r == RoleCenterAdmin || r == RoleManager || r == RoleFinance
 }
 
 // User is a back-office account (center admin or mentor). PasswordHash never leaves

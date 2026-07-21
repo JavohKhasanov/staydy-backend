@@ -25,12 +25,12 @@ type createStaffRequest struct {
 	Email    string `json:"email" format:"email" maxLength:"255" example:"moliya@markaz.uz"`
 	Password string `json:"password" minLength:"8" maxLength:"128"`
 	FullName string `json:"fullName" minLength:"1" maxLength:"255" example:"Dilnoza Karimova"`
-	Role     string `json:"role" enum:"center_admin,finance" doc:"center_admin (administrator) or finance (moliya)"`
+	Role     string `json:"role" enum:"center_admin,manager,finance" doc:"center_admin (direktor), manager (administrator), or finance (moliya)"`
 }
 type updateStaffRequest struct {
 	Email    string `json:"email" format:"email" maxLength:"255"`
 	FullName string `json:"fullName" minLength:"1" maxLength:"255"`
-	Role     string `json:"role" enum:"center_admin,finance"`
+	Role     string `json:"role" enum:"center_admin,manager,finance"`
 }
 type setStaffPasswordRequest struct {
 	Password string `json:"password" minLength:"8" maxLength:"128"`

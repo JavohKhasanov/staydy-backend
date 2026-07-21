@@ -175,8 +175,12 @@ type groupFinanceInput struct {
 }
 type groupFinanceOutput struct{ Body groupFinanceBody }
 
-// registerFinance mounts the manual money ledger. Mount on a group gated to center_admin.
-func registerFinance(api huma.API, svc *financeusecase.Service, log zerolog.Logger) {
+// registerFinance mounts the money ledger across two gates. Operational endpoints (student
+// balances, invoices, payments, debtors, group fee roster, alerts, billing settings) go on `api`,
+// which admits the front-desk administrator (manager) so they can collect payments. The sensitive
+// aggregate endpoints (center profit/expense summary, expense ledger) go on `sensitiveAPI`, gated
+// to director + finance only.
+func registerFinance(api, sensitiveAPI huma.API, svc *financeusecase.Service, log zerolog.Logger) {
 	Register(api, BearerOperation(huma.Operation{
 		OperationID: "student-finance",
 		Method:      http.MethodGet,
@@ -350,7 +354,7 @@ func registerFinance(api huma.API, svc *financeusecase.Service, log zerolog.Logg
 		return &deleteFinanceOutput{}, nil
 	})
 
-	Register(api, BearerOperation(huma.Operation{
+	Register(sensitiveAPI, BearerOperation(huma.Operation{
 		OperationID: "finance-summary",
 		Method:      http.MethodGet,
 		Path:        "/finance/summary",
@@ -526,7 +530,7 @@ func registerFinance(api huma.API, svc *financeusecase.Service, log zerolog.Logg
 		return &billingSettingsOutput{Body: in.Body}, nil
 	})
 
-	Register(api, BearerOperation(huma.Operation{
+	Register(sensitiveAPI, BearerOperation(huma.Operation{
 		OperationID: "expenses-list",
 		Method:      http.MethodGet,
 		Path:        "/finance/expenses",
@@ -563,7 +567,7 @@ func registerFinance(api huma.API, svc *financeusecase.Service, log zerolog.Logg
 		return out, nil
 	})
 
-	Register(api, BearerOperation(huma.Operation{
+	Register(sensitiveAPI, BearerOperation(huma.Operation{
 		OperationID:   "expense-create",
 		Method:        http.MethodPost,
 		Path:          "/finance/expenses",
@@ -592,7 +596,7 @@ func registerFinance(api huma.API, svc *financeusecase.Service, log zerolog.Logg
 		return &expenseOutput{Body: toExpenseResponse(e)}, nil
 	})
 
-	Register(api, BearerOperation(huma.Operation{
+	Register(sensitiveAPI, BearerOperation(huma.Operation{
 		OperationID:   "expense-delete",
 		Method:        http.MethodDelete,
 		Path:          "/finance/expenses/{id}",

@@ -146,14 +146,14 @@ VALUES ($1, $2, $3, $4, $5)
 RETURNING *;
 
 -- name: ListStaffUsers :many
-SELECT * FROM users WHERE role IN ('center_admin', 'finance') ORDER BY full_name ASC;
+SELECT * FROM users WHERE role IN ('center_admin', 'manager', 'finance') ORDER BY full_name ASC;
 
 -- name: UpdateStaffUser :one
 UPDATE users SET full_name = $2, email = $3, role = $4, updated_at = now()
-WHERE id = $1 AND role IN ('center_admin', 'finance') RETURNING *;
+WHERE id = $1 AND role IN ('center_admin', 'manager', 'finance') RETURNING *;
 
 -- name: DeleteStaffUser :exec
-DELETE FROM users WHERE id = $1 AND role IN ('center_admin', 'finance');
+DELETE FROM users WHERE id = $1 AND role IN ('center_admin', 'manager', 'finance');
 
 -- name: CountStaffByRole :one
 SELECT count(*) FROM users WHERE role = $1;

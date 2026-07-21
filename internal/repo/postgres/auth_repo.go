@@ -121,3 +121,10 @@ func (r *AuthRepository) UserByID(ctx context.Context, orgID, id uuid.UUID) (ent
 	}
 	return mapUser(row), nil
 }
+
+// SetPassword updates a user's password hash (self-service change-password), RLS-scoped.
+func (r *AuthRepository) SetPassword(ctx context.Context, orgID, id uuid.UUID, hash string) error {
+	return r.db.WithTenant(ctx, orgID.String(), func(tx pgx.Tx) error {
+		return sqlc.New(tx).UpdateUserPassword(ctx, sqlc.UpdateUserPasswordParams{ID: id, PasswordHash: hash})
+	})
+}

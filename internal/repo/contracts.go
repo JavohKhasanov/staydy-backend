@@ -42,6 +42,7 @@ type AuthRepository interface {
 	SlugExists(ctx context.Context, slug string) (bool, error)
 	UserByEmailInOrg(ctx context.Context, orgID uuid.UUID, email string) (entity.User, error)
 	UserByID(ctx context.Context, orgID, id uuid.UUID) (entity.User, error)
+	SetPassword(ctx context.Context, orgID, id uuid.UUID, hash string) error
 	// AllOrgIDs lists every center (NON-RLS) — for the cross-tenant scheduler.
 	AllOrgIDs(ctx context.Context) ([]uuid.UUID, error)
 }

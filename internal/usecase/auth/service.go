@@ -11,6 +11,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
+
 	"github.com/student-success/backend/internal/entity"
 	"github.com/student-success/backend/internal/repo"
 	"github.com/student-success/backend/internal/security"
@@ -143,6 +145,29 @@ func (s *Service) Login(ctx context.Context, p LoginParams, dev DeviceMetadata) 
 		return nil, ErrSuspended
 	}
 	return s.issue(ctx, org, user, dev)
+}
+
+// ChangePassword lets an authenticated user rotate their own password after re-verifying the
+// current one. Works for any role, including the platform owner (superadmin).
+func (s *Service) ChangePassword(ctx context.Context, orgID, userID uuid.UUID, current, next string) error {
+	if len(next) < 8 || next == current {
+		return ErrValidation
+	}
+	user, err := s.auth.UserByID(ctx, orgID, userID)
+	if err != nil {
+		if errors.Is(err, repo.ErrNotFound) {
+			return ErrInvalidCredentials
+		}
+		return fmt.Errorf("auth: user lookup: %w", err)
+	}
+	if !security.CheckPassword(user.PasswordHash, current) {
+		return ErrInvalidCredentials
+	}
+	hash, err := security.HashPassword(next)
+	if err != nil {
+		return err
+	}
+	return s.auth.SetPassword(ctx, orgID, userID, hash)
 }
 
 // Refresh rotates a refresh token: it verifies and revokes the presented one, then

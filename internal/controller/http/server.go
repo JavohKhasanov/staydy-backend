@@ -120,6 +120,7 @@ func NewServer(deps Dependencies) *Server {
 	registerDashboard(protectedAPI, deps.Dashboard, deps.Logger)
 	registerAdvice(protectedAPI, deps.Students, deps.Advice, deps.Logger)
 	registerTelegram(protectedAPI, deps.Bot, deps.Logger)
+	registerAccount(protectedAPI, deps.Auth, deps.Logger) // self-service change-password (any role)
 
 	// Finance panel: finance + salary + reports data, open to the finance role as well as
 	// center_admin / super_admin. Read-only teacher/group lists also mount here so the finance

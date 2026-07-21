@@ -34,6 +34,7 @@ import (
 	planusecase "github.com/student-success/backend/internal/usecase/plan"
 	roomusecase "github.com/student-success/backend/internal/usecase/room"
 	salaryusecase "github.com/student-success/backend/internal/usecase/salary"
+	staffusecase "github.com/student-success/backend/internal/usecase/staff"
 	signupusecase "github.com/student-success/backend/internal/usecase/signup"
 	studentusecase "github.com/student-success/backend/internal/usecase/student"
 	superadminusecase "github.com/student-success/backend/internal/usecase/superadmin"
@@ -54,6 +55,7 @@ type Dependencies struct {
 	Bot           *botusecase.Service
 	Groups        *groupusecase.Service
 	Teachers      *teacherusecase.Service
+	Staff         *staffusecase.Service
 	Obstacles     *obstacleusecase.Service
 	Courses       *courseusecase.Service
 	Enrollments   *enrollmentusecase.Service
@@ -119,17 +121,26 @@ func NewServer(deps Dependencies) *Server {
 	registerAdvice(protectedAPI, deps.Students, deps.Advice, deps.Logger)
 	registerTelegram(protectedAPI, deps.Bot, deps.Logger)
 
+	// Finance panel: finance + salary + reports data, open to the finance role as well as
+	// center_admin / super_admin. Read-only teacher/group lists also mount here so the finance
+	// pages can render debtor/salary/report context without full org-management access.
+	financeAPI := huma.NewGroup(api, "/api/v1")
+	financeAPI.UseMiddleware(RequireAuth(api, deps.TokenManager))
+	financeAPI.UseMiddleware(RequireRole(api, entity.RoleFinance, entity.RoleCenterAdmin, entity.RoleSuperAdmin))
+	registerFinance(financeAPI, deps.Finance, deps.Logger)
+	registerSalary(financeAPI, deps.Salary, deps.Logger)
+
 	// Org-structure management (groups + teachers) is restricted to center_admin / super_admin.
+	// The read-only list endpoints are handed financeAPI so finance can read them too.
 	centerAdminAPI := huma.NewGroup(api, "/api/v1")
 	centerAdminAPI.UseMiddleware(RequireAuth(api, deps.TokenManager))
 	centerAdminAPI.UseMiddleware(RequireRole(api, entity.RoleCenterAdmin, entity.RoleSuperAdmin))
-	registerGroups(centerAdminAPI, deps.Groups, deps.Logger)
-	registerTeachers(centerAdminAPI, deps.Teachers, deps.Logger)
+	registerGroups(centerAdminAPI, financeAPI, deps.Groups, deps.Logger)
+	registerTeachers(centerAdminAPI, financeAPI, deps.Teachers, deps.Logger)
+	registerStaff(centerAdminAPI, deps.Staff, deps.Logger)
 	registerObstacleOptions(centerAdminAPI, deps.Obstacles, deps.Logger)
 	registerCourses(centerAdminAPI, deps.Courses, deps.Logger)
 	registerEnrollments(centerAdminAPI, deps.Enrollments, deps.Logger)
-	registerFinance(centerAdminAPI, deps.Finance, deps.Logger)
-	registerSalary(centerAdminAPI, deps.Salary, deps.Logger)
 	registerBranches(centerAdminAPI, deps.Branches, deps.Logger)
 	registerRooms(centerAdminAPI, deps.Rooms, deps.Logger)
 	registerLeads(centerAdminAPI, deps.Leads, deps.Students, deps.Logger)

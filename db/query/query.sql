@@ -138,6 +138,26 @@ INSERT INTO users (org_id, email, password_hash, full_name, role, branch_id)
 VALUES ($1, $2, $3, $4, 'teacher', $5)
 RETURNING *;
 
+-- name: CreateStaffUser :one
+-- Create a back-office staff account (administrator or finance). Role is a parameter, unlike the
+-- teacher path; the usecase restricts it to allowed staff roles.
+INSERT INTO users (org_id, email, password_hash, full_name, role)
+VALUES ($1, $2, $3, $4, $5)
+RETURNING *;
+
+-- name: ListStaffUsers :many
+SELECT * FROM users WHERE role IN ('center_admin', 'finance') ORDER BY full_name ASC;
+
+-- name: UpdateStaffUser :one
+UPDATE users SET full_name = $2, email = $3, role = $4, updated_at = now()
+WHERE id = $1 AND role IN ('center_admin', 'finance') RETURNING *;
+
+-- name: DeleteStaffUser :exec
+DELETE FROM users WHERE id = $1 AND role IN ('center_admin', 'finance');
+
+-- name: CountStaffByRole :one
+SELECT count(*) FROM users WHERE role = $1;
+
 -- name: UpdateTeacher :one
 UPDATE users SET full_name = $2, email = $3, branch_id = $4, updated_at = now()
 WHERE id = $1 AND role = 'teacher' RETURNING *;

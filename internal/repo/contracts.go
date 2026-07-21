@@ -174,6 +174,16 @@ type GroupRepository interface {
 	ListForStudent(ctx context.Context, orgID, studentID uuid.UUID) ([]entity.Group, error)
 }
 
+// StaffRepository manages back-office staff accounts (center_admin + finance), RLS-scoped.
+type StaffRepository interface {
+	Create(ctx context.Context, orgID uuid.UUID, email, passwordHash, fullName, role string) (entity.User, error)
+	List(ctx context.Context, orgID uuid.UUID) ([]entity.User, error)
+	Update(ctx context.Context, orgID, id uuid.UUID, email, fullName, role string) (entity.User, error)
+	SetPassword(ctx context.Context, orgID, id uuid.UUID, passwordHash string) error
+	Delete(ctx context.Context, orgID, id uuid.UUID) error
+	CountByRole(ctx context.Context, orgID uuid.UUID, role string) (int64, error)
+}
+
 // TeacherRepository manages teacher accounts (users with role 'teacher'), RLS-scoped.
 type TeacherRepository interface {
 	Create(ctx context.Context, orgID uuid.UUID, email, passwordHash, fullName string, branchID *uuid.UUID) (entity.User, error)

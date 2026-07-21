@@ -169,6 +169,17 @@ func (q *Queries) CountRoomConflicts(ctx context.Context, arg CountRoomConflicts
 	return column_1, err
 }
 
+const countStaffByRole = `-- name: CountStaffByRole :one
+SELECT count(*) FROM users WHERE role = $1
+`
+
+func (q *Queries) CountStaffByRole(ctx context.Context, role string) (int64, error) {
+	row := q.db.QueryRow(ctx, countStaffByRole, role)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const countStudentsByTier = `-- name: CountStudentsByTier :many
 
 SELECT risk_tier, count(*) AS count
@@ -1173,6 +1184,47 @@ func (q *Queries) CreateSignupRequest(ctx context.Context, arg CreateSignupReque
 	return i, err
 }
 
+const createStaffUser = `-- name: CreateStaffUser :one
+INSERT INTO users (org_id, email, password_hash, full_name, role)
+VALUES ($1, $2, $3, $4, $5)
+RETURNING id, org_id, email, password_hash, full_name, role, phone, is_active, branch_id, created_at, updated_at
+`
+
+type CreateStaffUserParams struct {
+	OrgID        uuid.UUID `json:"org_id"`
+	Email        string    `json:"email"`
+	PasswordHash string    `json:"password_hash"`
+	FullName     string    `json:"full_name"`
+	Role         string    `json:"role"`
+}
+
+// Create a back-office staff account (administrator or finance). Role is a parameter, unlike the
+// teacher path; the usecase restricts it to allowed staff roles.
+func (q *Queries) CreateStaffUser(ctx context.Context, arg CreateStaffUserParams) (User, error) {
+	row := q.db.QueryRow(ctx, createStaffUser,
+		arg.OrgID,
+		arg.Email,
+		arg.PasswordHash,
+		arg.FullName,
+		arg.Role,
+	)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.OrgID,
+		&i.Email,
+		&i.PasswordHash,
+		&i.FullName,
+		&i.Role,
+		&i.Phone,
+		&i.IsActive,
+		&i.BranchID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const createStudent = `-- name: CreateStudent :one
 
 INSERT INTO students (
@@ -1591,6 +1643,15 @@ DELETE FROM salary_slips WHERE id = $1
 
 func (q *Queries) DeleteSalarySlip(ctx context.Context, id uuid.UUID) error {
 	_, err := q.db.Exec(ctx, deleteSalarySlip, id)
+	return err
+}
+
+const deleteStaffUser = `-- name: DeleteStaffUser :exec
+DELETE FROM users WHERE id = $1 AND role IN ('center_admin', 'finance')
+`
+
+func (q *Queries) DeleteStaffUser(ctx context.Context, id uuid.UUID) error {
+	_, err := q.db.Exec(ctx, deleteStaffUser, id)
 	return err
 }
 
@@ -3378,6 +3439,42 @@ func (q *Queries) ListSignupRequests(ctx context.Context) ([]SignupRequest, erro
 	return items, nil
 }
 
+const listStaffUsers = `-- name: ListStaffUsers :many
+SELECT id, org_id, email, password_hash, full_name, role, phone, is_active, branch_id, created_at, updated_at FROM users WHERE role IN ('center_admin', 'finance') ORDER BY full_name ASC
+`
+
+func (q *Queries) ListStaffUsers(ctx context.Context) ([]User, error) {
+	rows, err := q.db.Query(ctx, listStaffUsers)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []User{}
+	for rows.Next() {
+		var i User
+		if err := rows.Scan(
+			&i.ID,
+			&i.OrgID,
+			&i.Email,
+			&i.PasswordHash,
+			&i.FullName,
+			&i.Role,
+			&i.Phone,
+			&i.IsActive,
+			&i.BranchID,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listStudents = `-- name: ListStudents :many
 SELECT id, org_id, name, phone, telegram_id, telegram_chat_id, course_name, group_name, group_id, mentor_name, start_date, onboarding_goal, six_month_target, weekly_study_hours, confidence_level, risk_score, risk_tier, email, birth_date, gender, second_phone, address, parent_name, parent_phone, student_code, status, mentor_id, branch_id, created_at, updated_at FROM students
 ORDER BY risk_score DESC, name ASC
@@ -4601,6 +4698,42 @@ func (q *Queries) UpdateSignupRequestStatus(ctx context.Context, arg UpdateSignu
 		&i.Message,
 		&i.Status,
 		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const updateStaffUser = `-- name: UpdateStaffUser :one
+UPDATE users SET full_name = $2, email = $3, role = $4, updated_at = now()
+WHERE id = $1 AND role IN ('center_admin', 'finance') RETURNING id, org_id, email, password_hash, full_name, role, phone, is_active, branch_id, created_at, updated_at
+`
+
+type UpdateStaffUserParams struct {
+	ID       uuid.UUID `json:"id"`
+	FullName string    `json:"full_name"`
+	Email    string    `json:"email"`
+	Role     string    `json:"role"`
+}
+
+func (q *Queries) UpdateStaffUser(ctx context.Context, arg UpdateStaffUserParams) (User, error) {
+	row := q.db.QueryRow(ctx, updateStaffUser,
+		arg.ID,
+		arg.FullName,
+		arg.Email,
+		arg.Role,
+	)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.OrgID,
+		&i.Email,
+		&i.PasswordHash,
+		&i.FullName,
+		&i.Role,
+		&i.Phone,
+		&i.IsActive,
+		&i.BranchID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
 	)
 	return i, err
 }

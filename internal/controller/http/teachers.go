@@ -59,8 +59,10 @@ type teacherOutput struct{ Body teacherResponse }
 
 // registerTeachers mounts teacher-account management. Mount on a group gated to
 // center_admin / super_admin.
-func registerTeachers(api huma.API, svc *teacherusecase.Service, log zerolog.Logger) {
-	Register(api, BearerOperation(huma.Operation{
+// registerTeachers mounts teacher management on api (center_admin). The read-only list is mounted
+// on readAPI, which also admits finance (the salary/reports pages need the teacher list).
+func registerTeachers(api, readAPI huma.API, svc *teacherusecase.Service, log zerolog.Logger) {
+	Register(readAPI, BearerOperation(huma.Operation{
 		OperationID: "teachers-list",
 		Method:      http.MethodGet,
 		Path:        "/teachers",

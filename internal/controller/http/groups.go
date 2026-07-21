@@ -77,9 +77,10 @@ type assignGroupInput struct {
 type noContentOutput struct{}
 
 // registerGroups mounts group management + student↔group assignment. Mount on a group gated to
-// center_admin / super_admin.
-func registerGroups(api huma.API, svc *groupusecase.Service, log zerolog.Logger) {
-	Register(api, BearerOperation(huma.Operation{
+// center_admin / super_admin. The read-only list mounts on readAPI, which also admits finance
+// (the reports page needs the group list).
+func registerGroups(api, readAPI huma.API, svc *groupusecase.Service, log zerolog.Logger) {
+	Register(readAPI, BearerOperation(huma.Operation{
 		OperationID: "groups-list",
 		Method:      http.MethodGet,
 		Path:        "/groups",

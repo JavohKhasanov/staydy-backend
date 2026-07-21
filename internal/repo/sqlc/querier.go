@@ -23,6 +23,7 @@ type Querier interface {
 	// Room double-booking: same room + date with time overlap (existing.start < new.end AND
 	// existing.end > new.start). Excludes cancelled lessons, timeless lessons, and the given id (self).
 	CountRoomConflicts(ctx context.Context, arg CountRoomConflictsParams) (int64, error)
+	CountStaffByRole(ctx context.Context, role string) (int64, error)
 	// --- dashboard aggregates (RLS-scoped: run inside WithTenant) ---
 	CountStudentsByTier(ctx context.Context) ([]CountStudentsByTierRow, error)
 	CountStudentsInGroup(ctx context.Context, groupID uuid.UUID) (int64, error)
@@ -66,6 +67,9 @@ type Querier interface {
 	CreateRoom(ctx context.Context, arg CreateRoomParams) (Room, error)
 	CreateSalarySlip(ctx context.Context, arg CreateSalarySlipParams) (SalarySlip, error)
 	CreateSignupRequest(ctx context.Context, arg CreateSignupRequestParams) (SignupRequest, error)
+	// Create a back-office staff account (administrator or finance). Role is a parameter, unlike the
+	// teacher path; the usecase restricts it to allowed staff roles.
+	CreateStaffUser(ctx context.Context, arg CreateStaffUserParams) (User, error)
 	// --- students + notes (RLS-scoped: run inside WithTenant; no WHERE org_id) ---
 	CreateStudent(ctx context.Context, arg CreateStudentParams) (Student, error)
 	// --- surveys + attendance + intervention tasks (RLS-scoped: run inside WithTenant) ---
@@ -88,6 +92,7 @@ type Querier interface {
 	DeletePlan(ctx context.Context, id uuid.UUID) error
 	DeleteRoom(ctx context.Context, id uuid.UUID) error
 	DeleteSalarySlip(ctx context.Context, id uuid.UUID) error
+	DeleteStaffUser(ctx context.Context, id uuid.UUID) error
 	DeleteStudent(ctx context.Context, id uuid.UUID) error
 	DeleteTeacher(ctx context.Context, id uuid.UUID) error
 	DeleteTeacherGroupRules(ctx context.Context, dollar_1 uuid.UUID) error
@@ -151,6 +156,7 @@ type Querier interface {
 	ListSalaryGroupRules(ctx context.Context, dollar_1 uuid.UUID) ([]SalaryGroupRule, error)
 	ListSalarySlips(ctx context.Context, arg ListSalarySlipsParams) ([]ListSalarySlipsRow, error)
 	ListSignupRequests(ctx context.Context) ([]SignupRequest, error)
+	ListStaffUsers(ctx context.Context) ([]User, error)
 	ListStudents(ctx context.Context) ([]Student, error)
 	ListStudentsByGroup(ctx context.Context, groupID pgtype.UUID) ([]Student, error)
 	ListStudentsInGroup(ctx context.Context, groupID uuid.UUID) ([]Student, error)
@@ -195,6 +201,7 @@ type Querier interface {
 	UpdatePlan(ctx context.Context, arg UpdatePlanParams) (Plan, error)
 	UpdateRoom(ctx context.Context, arg UpdateRoomParams) (Room, error)
 	UpdateSignupRequestStatus(ctx context.Context, arg UpdateSignupRequestStatusParams) (SignupRequest, error)
+	UpdateStaffUser(ctx context.Context, arg UpdateStaffUserParams) (User, error)
 	// General profile edit (name, contact, identity, onboarding, status, mentor). Risk fields and
 	// group are updated by their own queries; this leaves them untouched.
 	UpdateStudent(ctx context.Context, arg UpdateStudentParams) (Student, error)

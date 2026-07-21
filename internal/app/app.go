@@ -40,6 +40,7 @@ import (
 	signupusecase "github.com/student-success/backend/internal/usecase/signup"
 	studentusecase "github.com/student-success/backend/internal/usecase/student"
 	superadminusecase "github.com/student-success/backend/internal/usecase/superadmin"
+	staffusecase "github.com/student-success/backend/internal/usecase/staff"
 	teacherusecase "github.com/student-success/backend/internal/usecase/teacher"
 )
 
@@ -81,6 +82,7 @@ func New(ctx context.Context, cfg *config.Config) (*Application, error) {
 	dashboardRepo := repopg.NewDashboardRepository(db)
 	groupRepo := repopg.NewGroupRepository(db)
 	teacherRepo := repopg.NewTeacherRepository(db)
+	staffRepo := repopg.NewStaffRepository(db)
 
 	geminiClient := gemini.New(cfg.Gemini.APIKey, cfg.Gemini.Model, "")
 	telegramClient := telegram.New(cfg.Telegram.BotToken, "")
@@ -102,6 +104,7 @@ func New(ctx context.Context, cfg *config.Config) (*Application, error) {
 	interventionService := interventionusecase.NewService(interventionRepo)
 	groupService := groupusecase.NewService(groupRepo, teacherRepo, studentRepo)
 	teacherService := teacherusecase.NewService(teacherRepo)
+	staffService := staffusecase.NewService(staffRepo)
 	obstacleService := obstacleusecase.NewService(repopg.NewObstacleRepository(db))
 	courseService := courseusecase.NewService(repopg.NewCourseRepository(db))
 	enrollmentService := enrollmentusecase.NewService(repopg.NewEnrollmentRepository(db))
@@ -136,6 +139,7 @@ func New(ctx context.Context, cfg *config.Config) (*Application, error) {
 		Bot:           botService,
 		Groups:        groupService,
 		Teachers:      teacherService,
+		Staff:         staffService,
 		Obstacles:     obstacleService,
 		Courses:       courseService,
 		Enrollments:   enrollmentService,

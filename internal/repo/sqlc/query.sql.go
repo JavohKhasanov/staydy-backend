@@ -2216,10 +2216,15 @@ const groupsMissingAttendance = `-- name: GroupsMissingAttendance :many
 SELECT g.id, g.org_id, g.name, g.teacher_id, g.course_id, g.branch_id, g.direction, g.schedule_days, g.capacity, g.start_date, g.end_date, g.created_at, g.updated_at, g.start_time, g.end_time, g.room_id FROM groups g
 WHERE g.schedule_days LIKE '%' || $1::text || '%'
   AND EXISTS (SELECT 1 FROM group_members m WHERE m.group_id = g.id)
-  AND NOT EXISTS (
-    SELECT 1 FROM attendance_records ar
-    JOIN group_members m2 ON m2.student_id = ar.student_id AND m2.group_id = g.id
-    WHERE ar.date = $2::date
+  AND EXISTS (
+    SELECT 1 FROM group_members m
+    WHERE m.group_id = g.id
+      AND NOT EXISTS (
+        SELECT 1 FROM attendance_records ar
+        WHERE ar.student_id = m.student_id
+          AND ar.group_id = g.id
+          AND ar.date = $2::date
+      )
   )
 ORDER BY g.start_time ASC
 `
@@ -2229,8 +2234,10 @@ type GroupsMissingAttendanceParams struct {
 	Date    pgtype.Date `json:"date"`
 }
 
-// Groups that meet on the given weekday but have NO attendance record for the date
-// (and have at least one student). Powers the "davomat qilinmagan" dashboard alert.
+// Groups that meet on the given weekday and still have at least one member with NO attendance
+// record for THIS group on the date — i.e. attendance isn't fully marked yet. The warning persists
+// until every member is marked, and is scoped to this group (marking another group won't clear it).
+// Powers the "davomat qilinmagan" dashboard/notification alert.
 func (q *Queries) GroupsMissingAttendance(ctx context.Context, arg GroupsMissingAttendanceParams) ([]Group, error) {
 	rows, err := q.db.Query(ctx, groupsMissingAttendance, arg.DayCode, arg.Date)
 	if err != nil {

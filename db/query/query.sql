@@ -214,15 +214,22 @@ WHERE m.group_id = $1
 ORDER BY s.risk_score DESC, s.name ASC;
 
 -- name: GroupsMissingAttendance :many
--- Groups that meet on the given weekday but have NO attendance record for the date
--- (and have at least one student). Powers the "davomat qilinmagan" dashboard alert.
+-- Groups that meet on the given weekday and still have at least one member with NO attendance
+-- record for THIS group on the date — i.e. attendance isn't fully marked yet. The warning persists
+-- until every member is marked, and is scoped to this group (marking another group won't clear it).
+-- Powers the "davomat qilinmagan" dashboard/notification alert.
 SELECT g.* FROM groups g
 WHERE g.schedule_days LIKE '%' || sqlc.arg(day_code)::text || '%'
   AND EXISTS (SELECT 1 FROM group_members m WHERE m.group_id = g.id)
-  AND NOT EXISTS (
-    SELECT 1 FROM attendance_records ar
-    JOIN group_members m2 ON m2.student_id = ar.student_id AND m2.group_id = g.id
-    WHERE ar.date = sqlc.arg(date)::date
+  AND EXISTS (
+    SELECT 1 FROM group_members m
+    WHERE m.group_id = g.id
+      AND NOT EXISTS (
+        SELECT 1 FROM attendance_records ar
+        WHERE ar.student_id = m.student_id
+          AND ar.group_id = g.id
+          AND ar.date = sqlc.arg(date)::date
+      )
   )
 ORDER BY g.start_time ASC;
 

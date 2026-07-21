@@ -114,8 +114,10 @@ type Querier interface {
 	// (the "started studying, hasn't been billed" signal; caller applies the grace threshold).
 	GraceOverdueStudents(ctx context.Context, period string) ([]GraceOverdueStudentsRow, error)
 	GroupFinanceByPeriod(ctx context.Context, arg GroupFinanceByPeriodParams) ([]GroupFinanceByPeriodRow, error)
-	// Groups that meet on the given weekday but have NO attendance record for the date
-	// (and have at least one student). Powers the "davomat qilinmagan" dashboard alert.
+	// Groups that meet on the given weekday and still have at least one member with NO attendance
+	// record for THIS group on the date — i.e. attendance isn't fully marked yet. The warning persists
+	// until every member is marked, and is scoped to this group (marking another group won't clear it).
+	// Powers the "davomat qilinmagan" dashboard/notification alert.
 	GroupsMissingAttendance(ctx context.Context, arg GroupsMissingAttendanceParams) ([]Group, error)
 	HighRiskStudents(ctx context.Context) ([]Student, error)
 	InsertSalaryGroupRule(ctx context.Context, arg InsertSalaryGroupRuleParams) (SalaryGroupRule, error)

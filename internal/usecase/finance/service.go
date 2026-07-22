@@ -63,6 +63,22 @@ func (s *Service) DeleteInvoice(ctx context.Context, orgID, id uuid.UUID) error 
 	return s.repo.DeleteInvoice(ctx, orgID, id)
 }
 
+// GenerateMonthlyInvoices bills every active group member for the month (period, "YYYY-MM") at their
+// course price, skipping anyone already invoiced for that group+period. Idempotent. Returns the
+// number of invoices created.
+func (s *Service) GenerateMonthlyInvoices(ctx context.Context, orgID uuid.UUID, period string) (int64, error) {
+	if !validPeriod(period) {
+		return 0, ErrValidation
+	}
+	return s.repo.GenerateMonthly(ctx, orgID, period)
+}
+
+// validPeriod checks a "YYYY-MM" string is a real month.
+func validPeriod(period string) bool {
+	_, err := time.Parse("2006-01", period)
+	return err == nil
+}
+
 type PaymentInput struct {
 	Amount int64
 	Method string

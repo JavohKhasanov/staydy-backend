@@ -404,6 +404,7 @@ type UpdateEnrollmentParams struct {
 type FinanceRepository interface {
 	ListInvoices(ctx context.Context, orgID, studentID uuid.UUID) ([]entity.Invoice, error)
 	CreateInvoice(ctx context.Context, orgID uuid.UUID, p CreateInvoiceParams) (entity.Invoice, error)
+	GenerateMonthly(ctx context.Context, orgID uuid.UUID, period string) (int64, error)
 	DeleteInvoice(ctx context.Context, orgID, id uuid.UUID) error
 	StudentBalance(ctx context.Context, orgID, studentID uuid.UUID) (int64, error)
 	ListPayments(ctx context.Context, orgID, studentID uuid.UUID) ([]entity.Payment, error)

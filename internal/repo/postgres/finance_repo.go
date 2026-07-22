@@ -66,6 +66,18 @@ func (r *FinanceRepository) CreateInvoice(ctx context.Context, orgID uuid.UUID, 
 	return mapInvoice(row), nil
 }
 
+// GenerateMonthly bills every active group member for the period at their course price, skipping any
+// already invoiced for that group+period. Returns how many invoices were created.
+func (r *FinanceRepository) GenerateMonthly(ctx context.Context, orgID uuid.UUID, period string) (int64, error) {
+	var n int64
+	err := r.db.WithTenant(ctx, orgID.String(), func(tx pgx.Tx) error {
+		var e error
+		n, e = sqlc.New(tx).GenerateMonthlyInvoices(ctx, period)
+		return e
+	})
+	return n, err
+}
+
 func (r *FinanceRepository) DeleteInvoice(ctx context.Context, orgID, id uuid.UUID) error {
 	return r.db.WithTenant(ctx, orgID.String(), func(tx pgx.Tx) error {
 		return sqlc.New(tx).DeleteInvoice(ctx, sqlc.DeleteInvoiceParams{OrgID: orgID, ID: id})

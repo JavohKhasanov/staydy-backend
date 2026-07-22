@@ -98,6 +98,10 @@ type Querier interface {
 	DeleteTeacherGroupRules(ctx context.Context, dollar_1 uuid.UUID) error
 	ExpensesByCategory(ctx context.Context, arg ExpensesByCategoryParams) ([]ExpensesByCategoryRow, error)
 	FinanceSummary(ctx context.Context, dollar_1 uuid.UUID) (FinanceSummaryRow, error)
+	// Bill every active group member for @period (YYYY-MM) at their group's course price, skipping
+	// anyone already invoiced for that group+period. Idempotent — safe to run repeatedly. Due on the
+	// 10th. Returns the number of invoices created.
+	GenerateMonthlyInvoices(ctx context.Context, period string) (int64, error)
 	GetBotConversation(ctx context.Context, telegramChatID int64) (BotConversation, error)
 	GetCourse(ctx context.Context, arg GetCourseParams) (Course, error)
 	GetGraceLessons(ctx context.Context, id uuid.UUID) (int32, error)

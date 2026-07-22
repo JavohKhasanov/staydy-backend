@@ -81,6 +81,17 @@ type financeIDInput struct {
 }
 type deleteFinanceOutput struct{}
 
+type generateInvoicesInput struct {
+	Body struct {
+		Period string `json:"period" doc:"YYYY-MM"`
+	}
+}
+type generateInvoicesOutput struct {
+	Body struct {
+		Created int64 `json:"created"`
+	}
+}
+
 type financeSummaryInput struct{}
 type financeSummaryOutput struct {
 	Body struct {
@@ -275,6 +286,27 @@ func registerFinance(api, sensitiveAPI huma.API, svc *financeusecase.Service, lo
 			return nil, mapFinanceError(LangFromContext(ctx), err, log)
 		}
 		return &deleteFinanceOutput{}, nil
+	})
+
+	Register(api, BearerOperation(huma.Operation{
+		OperationID: "invoices-generate-monthly",
+		Method:      http.MethodPost,
+		Path:        "/finance/invoices/generate",
+		Summary:     "Bill every active group member for a month at their course price (idempotent)",
+		Tags:        []string{"finance"},
+		Errors:      []int{http.StatusUnprocessableEntity, http.StatusForbidden, http.StatusInternalServerError},
+	}), func(ctx context.Context, in *generateInvoicesInput) (*generateInvoicesOutput, error) {
+		p, err := principal(ctx)
+		if err != nil {
+			return nil, err
+		}
+		created, err := svc.GenerateMonthlyInvoices(ctx, p.OrgID, in.Body.Period)
+		if err != nil {
+			return nil, mapFinanceError(LangFromContext(ctx), err, log)
+		}
+		return &generateInvoicesOutput{Body: struct {
+			Created int64 `json:"created"`
+		}{Created: created}}, nil
 	})
 
 	Register(api, BearerOperation(huma.Operation{

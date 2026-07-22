@@ -431,6 +431,21 @@ INSERT INTO invoices (org_id, student_id, group_id, enrollment_id, amount, due_d
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 RETURNING *;
 
+-- name: GenerateMonthlyInvoices :execrows
+-- Bill every active group member for @period (YYYY-MM) at their group's course price, skipping
+-- anyone already invoiced for that group+period. Idempotent — safe to run repeatedly. Due on the
+-- 10th. Returns the number of invoices created.
+INSERT INTO invoices (org_id, student_id, group_id, amount, due_date, period, note)
+SELECT m.org_id, m.student_id, m.group_id, c.price, (@period::text || '-10')::date, @period::text, 'Oylik to''lov'
+FROM group_members m
+JOIN students s ON s.id = m.student_id AND s.status = 'active'
+JOIN groups g ON g.id = m.group_id
+JOIN courses c ON c.id = g.course_id AND c.price > 0
+WHERE NOT EXISTS (
+  SELECT 1 FROM invoices i
+  WHERE i.student_id = m.student_id AND i.group_id = m.group_id AND i.period = @period::text
+);
+
 -- name: DeleteInvoice :exec
 DELETE FROM invoices WHERE org_id = $1 AND id = $2;
 

@@ -1751,6 +1751,30 @@ func (q *Queries) FinanceSummary(ctx context.Context, dollar_1 uuid.UUID) (Finan
 	return i, err
 }
 
+const generateMonthlyInvoices = `-- name: GenerateMonthlyInvoices :execrows
+INSERT INTO invoices (org_id, student_id, group_id, amount, due_date, period, note)
+SELECT m.org_id, m.student_id, m.group_id, c.price, ($1::text || '-10')::date, $1::text, 'Oylik to''lov'
+FROM group_members m
+JOIN students s ON s.id = m.student_id AND s.status = 'active'
+JOIN groups g ON g.id = m.group_id
+JOIN courses c ON c.id = g.course_id AND c.price > 0
+WHERE NOT EXISTS (
+  SELECT 1 FROM invoices i
+  WHERE i.student_id = m.student_id AND i.group_id = m.group_id AND i.period = $1::text
+)
+`
+
+// Bill every active group member for @period (YYYY-MM) at their group's course price, skipping
+// anyone already invoiced for that group+period. Idempotent — safe to run repeatedly. Due on the
+// 10th. Returns the number of invoices created.
+func (q *Queries) GenerateMonthlyInvoices(ctx context.Context, period string) (int64, error) {
+	result, err := q.db.Exec(ctx, generateMonthlyInvoices, period)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const getBotConversation = `-- name: GetBotConversation :one
 SELECT id, org_id, telegram_chat_id, student_id, flow, step, state, updated_at FROM bot_conversations WHERE telegram_chat_id = $1
 `

@@ -519,14 +519,16 @@ VALUES ($1, $2, $3, $4, $5)
 RETURNING *;
 
 -- name: TeacherGroupBasis :many
--- Per-group basis for a teacher's groups: active members (via group_members), done lessons, and
--- collected revenue in the period. Feeds the per-group salary computation.
+-- Per-group basis for a teacher's groups: active members (via group_members), lessons taught, and
+-- collected revenue in the period. Feeds the per-group salary computation. "Lessons" counts the
+-- distinct days the group was marked in attendance — the real daily workflow — not the optional
+-- lessons/session feature, so per-lesson pay reflects actual classes held.
 SELECT g.id AS group_id, g.name AS group_name,
   (SELECT count(*) FROM group_members m JOIN students s ON s.id = m.student_id
      WHERE m.group_id = g.id AND s.status = 'active')::bigint AS students,
-  (SELECT count(*) FROM lessons l
-     WHERE l.group_id = g.id AND l.status = 'done'
-       AND l.date >= $2::date AND l.date <= $3::date)::bigint AS lessons,
+  (SELECT count(DISTINCT ar.date) FROM attendance_records ar
+     WHERE ar.group_id = g.id
+       AND ar.date >= $2::date AND ar.date <= $3::date)::bigint AS lessons,
   (SELECT COALESCE(SUM(p.amount), 0) FROM payments p JOIN invoices i ON i.id = p.invoice_id
      WHERE i.group_id = g.id
        AND p.paid_at::date >= $2::date AND p.paid_at::date <= $3::date)::bigint AS revenue

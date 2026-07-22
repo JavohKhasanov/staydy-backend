@@ -186,8 +186,10 @@ type Querier interface {
 	SlugExists(ctx context.Context, slug string) (bool, error)
 	StartInterventionTask(ctx context.Context, id uuid.UUID) (InterventionTask, error)
 	StudentBalance(ctx context.Context, studentID uuid.UUID) (int64, error)
-	// Per-group basis for a teacher's groups: active members (via group_members), done lessons, and
-	// collected revenue in the period. Feeds the per-group salary computation.
+	// Per-group basis for a teacher's groups: active members (via group_members), lessons taught, and
+	// collected revenue in the period. Feeds the per-group salary computation. "Lessons" counts the
+	// distinct days the group was marked in attendance — the real daily workflow — not the optional
+	// lessons/session feature, so per-lesson pay reflects actual classes held.
 	TeacherGroupBasis(ctx context.Context, arg TeacherGroupBasisParams) ([]TeacherGroupBasisRow, error)
 	TeacherRevenue(ctx context.Context, arg TeacherRevenueParams) (int64, error)
 	TopObstacles(ctx context.Context) ([]TopObstaclesRow, error)

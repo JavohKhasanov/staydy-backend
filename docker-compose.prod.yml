@@ -88,6 +88,16 @@ services:
       - "172.17.0.1:3012:3000"
     restart: unless-stopped
 
+  # Student mini app (Telegram + web). Point the proxy host talaba.staydy.uz → 172.17.0.1:3013.
+  student:
+    build:
+      context: ../staydy-student
+      args:
+        VITE_API_BASE_URL: "https://api.staydy.uz/api/v1"
+    ports:
+      - "172.17.0.1:3013:3000"
+    restart: unless-stopped
+
   # Automated database backups: a compressed pg_dump on start and then daily, kept 14 days, written
   # to ./backups on the host (outside the pgdata volume). Restore with:
   #   gunzip -c backups/ssp-YYYYmmdd-HHMMSS.sql.gz | docker compose -f docker-compose.prod.yml exec -T postgres psql -U ssp -d ssp

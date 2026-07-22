@@ -14,7 +14,7 @@ flock -w 600 9 || { echo "!! another deploy is running; giving up"; exit 1; }
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 BACKEND="$ROOT/staydy-backend"
 
-for repo in staydy-backend staydy-website staydy-app staydy-superadmin; do
+for repo in staydy-backend staydy-website staydy-app staydy-superadmin staydy-student; do
   if [ -d "$ROOT/$repo/.git" ]; then
     echo "==> git pull $repo"
     git -C "$ROOT/$repo" pull --ff-only || echo "   (skipped — resolve $repo manually)"

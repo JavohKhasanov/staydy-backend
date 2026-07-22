@@ -6,6 +6,24 @@ import (
 	"github.com/google/uuid"
 )
 
+// StudentAccount is the minimal record used to authenticate a student login (cross-org lookup).
+type StudentAccount struct {
+	ID           uuid.UUID
+	OrgID        uuid.UUID
+	PasswordHash string
+	Name         string
+}
+
+// StudentProfile is the signed-in student's own profile shown in the mini app.
+type StudentProfile struct {
+	ID         uuid.UUID
+	OrgID      uuid.UUID
+	Name       string
+	Phone      string
+	CourseName string
+	GroupName  string
+}
+
 // Student is an enrolled learner tracked for retention risk.
 type Student struct {
 	ID               uuid.UUID

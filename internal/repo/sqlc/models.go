@@ -334,6 +334,7 @@ type Student struct {
 	OrgID            uuid.UUID          `json:"org_id"`
 	Name             string             `json:"name"`
 	Phone            pgtype.Text        `json:"phone"`
+	PasswordHash     string             `json:"password_hash"`
 	TelegramID       pgtype.Text        `json:"telegram_id"`
 	TelegramChatID   pgtype.Int8        `json:"telegram_chat_id"`
 	CourseName       pgtype.Text        `json:"course_name"`

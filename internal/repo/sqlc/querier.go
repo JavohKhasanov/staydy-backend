@@ -117,6 +117,8 @@ type Querier interface {
 	GetRefreshSessionByHash(ctx context.Context, tokenHash string) (RefreshSession, error)
 	GetSalaryRule(ctx context.Context, teacherID uuid.UUID) (SalaryRule, error)
 	GetStudent(ctx context.Context, id uuid.UUID) (Student, error)
+	// The signed-in student's own profile (RLS-scoped; id comes from the student JWT).
+	GetStudentForApp(ctx context.Context, id uuid.UUID) (GetStudentForAppRow, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	GetUserByID(ctx context.Context, id uuid.UUID) (User, error)
 	// Group members who attended sessions this period but have NO invoice for that group yet
@@ -182,6 +184,7 @@ type Querier interface {
 	SetBotConversationFlow(ctx context.Context, arg SetBotConversationFlowParams) error
 	SetGraceLessons(ctx context.Context, arg SetGraceLessonsParams) error
 	SetLeadStage(ctx context.Context, arg SetLeadStageParams) (Lead, error)
+	SetStudentLoginPassword(ctx context.Context, arg SetStudentLoginPasswordParams) error
 	SetStudentTelegramChat(ctx context.Context, arg SetStudentTelegramChatParams) error
 	SlugExists(ctx context.Context, slug string) (bool, error)
 	StartInterventionTask(ctx context.Context, id uuid.UUID) (InterventionTask, error)

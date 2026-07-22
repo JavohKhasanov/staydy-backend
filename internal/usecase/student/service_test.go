@@ -50,6 +50,10 @@ func (f *fakeRepo) AssignGroup(context.Context, uuid.UUID, uuid.UUID, *uuid.UUID
 func (f *fakeRepo) ListByGroup(context.Context, uuid.UUID, uuid.UUID) ([]entity.Student, error) {
 	return nil, nil
 }
+func (f *fakeRepo) SetLoginPassword(context.Context, uuid.UUID, uuid.UUID, string) error { return nil }
+func (f *fakeRepo) Profile(context.Context, uuid.UUID, uuid.UUID) (entity.StudentProfile, error) {
+	return entity.StudentProfile{}, nil
+}
 
 type stubSurveys struct{}
 

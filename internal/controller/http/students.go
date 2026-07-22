@@ -176,6 +176,12 @@ type studentOutput struct{ Body studentResponse }
 type studentIDInput struct {
 	ID string `path:"id" format:"uuid"`
 }
+type setStudentPasswordInput struct {
+	ID   string `path:"id" format:"uuid"`
+	Body struct {
+		Password string `json:"password" minLength:"6" maxLength:"128"`
+	}
+}
 type studentDetailOutput struct{ Body studentDetailResponse }
 type addNoteInput struct {
 	ID   string `path:"id" format:"uuid"`
@@ -358,6 +364,28 @@ func registerStudents(api huma.API, svc *studentusecase.Service, log zerolog.Log
 			return nil, huma.Error422UnprocessableEntity("invalid student id")
 		}
 		if err := svc.Delete(ctx, p.OrgID, id); err != nil {
+			return nil, mapStudentError(LangFromContext(ctx), err, log)
+		}
+		return nil, nil
+	})
+
+	Register(api, BearerOperation(huma.Operation{
+		OperationID: "students-set-login-password",
+		Method:      http.MethodPut,
+		Path:        "/students/{id}/login-password",
+		Summary:     "Set/reset a student's mini-app login password",
+		Tags:        []string{"students"},
+		Errors:      []int{http.StatusUnprocessableEntity, http.StatusInternalServerError},
+	}), func(ctx context.Context, in *setStudentPasswordInput) (*struct{}, error) {
+		p, err := principal(ctx)
+		if err != nil {
+			return nil, err
+		}
+		id, err := uuid.Parse(in.ID)
+		if err != nil {
+			return nil, huma.Error422UnprocessableEntity("invalid student id")
+		}
+		if err := svc.SetLoginPassword(ctx, p.OrgID, id, in.Body.Password); err != nil {
 			return nil, mapStudentError(LangFromContext(ctx), err, log)
 		}
 		return nil, nil

@@ -67,6 +67,31 @@ func (m *TokenManager) GenerateAccessToken(p entity.Principal) (string, time.Tim
 	return signed, expiresAt, err
 }
 
+// StudentTokenTTL is how long a student mini-app session lasts. Students get a single long-lived
+// access token (no refresh rotation) — the friction of frequent re-login isn't worth it for them,
+// and the token carries no back-office authority.
+const StudentTokenTTL = 30 * 24 * time.Hour
+
+// GenerateStudentToken signs a long-lived access token for a student. Subject is the student's id,
+// Role is "student"; there is no refresh token.
+func (m *TokenManager) GenerateStudentToken(p entity.Principal) (string, time.Time, error) {
+	now := time.Now()
+	expiresAt := now.Add(StudentTokenTTL)
+	claims := AccessClaims{
+		OrgID:    p.OrgID.String(),
+		FullName: p.FullName,
+		Role:     string(entity.RoleStudent),
+		RegisteredClaims: jwt.RegisteredClaims{
+			Issuer:    m.issuer,
+			Subject:   p.UserID.String(),
+			IssuedAt:  jwt.NewNumericDate(now),
+			ExpiresAt: jwt.NewNumericDate(expiresAt),
+		},
+	}
+	signed, err := jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString(m.signingKey)
+	return signed, expiresAt, err
+}
+
 // ParseAccessToken verifies a token and reconstructs the Principal from its claims.
 func (m *TokenManager) ParseAccessToken(token string) (entity.Principal, error) {
 	var claims AccessClaims

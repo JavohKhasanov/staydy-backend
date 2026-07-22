@@ -15,6 +15,7 @@ import (
 	"github.com/student-success/backend/internal/entity"
 	"github.com/student-success/backend/internal/repo"
 	"github.com/student-success/backend/internal/risk"
+	"github.com/student-success/backend/internal/security"
 )
 
 var (
@@ -217,6 +218,24 @@ func (s *Service) List(ctx context.Context, orgID uuid.UUID) ([]entity.Student, 
 // Delete removes a student and all their child records (attendance, notes, invoices, … cascade).
 func (s *Service) Delete(ctx context.Context, orgID, id uuid.UUID) error {
 	return s.students.Delete(ctx, orgID, id)
+}
+
+// SetLoginPassword sets (or resets) a student's mini-app login password. A center admin calls this
+// for their own students; the student then logs in with their phone + this password.
+func (s *Service) SetLoginPassword(ctx context.Context, orgID, id uuid.UUID, password string) error {
+	if len(password) < 6 {
+		return ErrValidation
+	}
+	hash, err := security.HashPassword(password)
+	if err != nil {
+		return err
+	}
+	return s.students.SetLoginPassword(ctx, orgID, id, hash)
+}
+
+// Profile returns the signed-in student's own profile (for the mini app).
+func (s *Service) Profile(ctx context.Context, orgID, id uuid.UUID) (entity.StudentProfile, error) {
+	return s.students.Profile(ctx, orgID, id)
 }
 
 // Get returns a student with notes, survey/attendance history, and a fresh risk breakdown.

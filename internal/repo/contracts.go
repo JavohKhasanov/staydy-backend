@@ -128,6 +128,14 @@ type StudentRepository interface {
 	ListNotes(ctx context.Context, orgID, studentID uuid.UUID) ([]entity.Note, error)
 	AssignGroup(ctx context.Context, orgID, studentID uuid.UUID, groupID *uuid.UUID) error
 	ListByGroup(ctx context.Context, orgID, groupID uuid.UUID) ([]entity.Student, error)
+	// Student mini-app: set a login password (admin), read the student's own profile (student token).
+	SetLoginPassword(ctx context.Context, orgID, id uuid.UUID, hash string) error
+	Profile(ctx context.Context, orgID, id uuid.UUID) (entity.StudentProfile, error)
+}
+
+// StudentAuthRepository resolves a student login by phone across tenants (RLS-bypassing lookup).
+type StudentAuthRepository interface {
+	LookupByPhone(ctx context.Context, phone string) ([]entity.StudentAccount, error)
 }
 
 // CreateGroupParams / UpdateGroupParams persist a group (org_id supplied separately, from the JWT).

@@ -313,6 +313,14 @@ UPDATE students
 SET risk_score = $2, risk_tier = $3, updated_at = now()
 WHERE id = $1;
 
+-- name: SetStudentLoginPassword :exec
+UPDATE students SET password_hash = $2, updated_at = now() WHERE id = $1;
+
+-- name: GetStudentForApp :one
+-- The signed-in student's own profile (RLS-scoped; id comes from the student JWT).
+SELECT id, org_id, name, phone, coalesce(course_name, '') AS course_name, coalesce(group_name, '') AS group_name
+FROM students WHERE id = $1;
+
 -- name: CreateNote :one
 INSERT INTO notes (org_id, student_id, author, text)
 VALUES ($1, $2, $3, $4)

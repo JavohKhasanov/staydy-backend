@@ -142,6 +142,34 @@ func (r *StudentRepository) UpdateRisk(ctx context.Context, orgID, id uuid.UUID,
 	})
 }
 
+// SetLoginPassword sets a student's mini-app login password hash (RLS-scoped; a center admin sets
+// or resets it for their own students).
+func (r *StudentRepository) SetLoginPassword(ctx context.Context, orgID, id uuid.UUID, hash string) error {
+	return r.db.WithTenant(ctx, orgID.String(), func(tx pgx.Tx) error {
+		return sqlc.New(tx).SetStudentLoginPassword(ctx, sqlc.SetStudentLoginPasswordParams{ID: id, PasswordHash: hash})
+	})
+}
+
+// Profile returns the signed-in student's own profile (RLS-scoped by orgID from their token).
+func (r *StudentRepository) Profile(ctx context.Context, orgID, id uuid.UUID) (entity.StudentProfile, error) {
+	var p entity.StudentProfile
+	err := r.db.WithTenant(ctx, orgID.String(), func(tx pgx.Tx) error {
+		row, e := sqlc.New(tx).GetStudentForApp(ctx, id)
+		if e != nil {
+			return e
+		}
+		p = entity.StudentProfile{
+			ID: row.ID, OrgID: row.OrgID, Name: row.Name, Phone: textToString(row.Phone),
+			CourseName: row.CourseName, GroupName: row.GroupName,
+		}
+		return nil
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return entity.StudentProfile{}, repo.ErrNotFound
+	}
+	return p, err
+}
+
 func (r *StudentRepository) AddNote(ctx context.Context, orgID, studentID uuid.UUID, author, text string) (entity.Note, error) {
 	var row sqlc.Note
 	err := r.db.WithTenant(ctx, orgID.String(), func(tx pgx.Tx) error {

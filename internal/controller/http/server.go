@@ -35,6 +35,7 @@ import (
 	roomusecase "github.com/student-success/backend/internal/usecase/room"
 	salaryusecase "github.com/student-success/backend/internal/usecase/salary"
 	staffusecase "github.com/student-success/backend/internal/usecase/staff"
+	studentauthusecase "github.com/student-success/backend/internal/usecase/studentauth"
 	signupusecase "github.com/student-success/backend/internal/usecase/signup"
 	studentusecase "github.com/student-success/backend/internal/usecase/student"
 	superadminusecase "github.com/student-success/backend/internal/usecase/superadmin"
@@ -56,6 +57,7 @@ type Dependencies struct {
 	Groups        *groupusecase.Service
 	Teachers      *teacherusecase.Service
 	Staff         *staffusecase.Service
+	StudentAuth   *studentauthusecase.Service
 	Obstacles     *obstacleusecase.Service
 	Courses       *courseusecase.Service
 	Enrollments   *enrollmentusecase.Service
@@ -112,9 +114,19 @@ func NewServer(deps Dependencies) *Server {
 	publicAPI := huma.NewGroup(api, "/api/v1")
 	protectedAPI := huma.NewGroup(api, "/api/v1")
 	protectedAPI.UseMiddleware(RequireAuth(api, deps.TokenManager))
+	// Back-office only: a student token must never reach tenant back-office endpoints (some groups
+	// gate on RequireAuth alone), so exclude the student role here.
+	protectedAPI.UseMiddleware(RequireRole(api, entity.BackOfficeRoles()...))
 
 	registerAuth(publicAPI, deps.Auth, deps.Logger)
-	registerAdminAuth(publicAPI, deps.Auth, deps.Logger) // superadmin login (public)
+	registerAdminAuth(publicAPI, deps.Auth, deps.Logger)   // superadmin login (public)
+	registerStudentAuth(publicAPI, deps.StudentAuth, deps.Logger) // student mini-app login (public)
+
+	// Student mini app: the signed-in student's own data, gated to the student role.
+	studentAPI := huma.NewGroup(api, "/api/v1")
+	studentAPI.UseMiddleware(RequireAuth(api, deps.TokenManager))
+	studentAPI.UseMiddleware(RequireRole(api, entity.RoleStudent))
+	registerStudentApp(studentAPI, deps.Students, deps.Logger)
 	registerStudents(protectedAPI, deps.Students, deps.Logger)
 	registerInterventions(protectedAPI, deps.Interventions, deps.Logger)
 	registerDashboard(protectedAPI, deps.Dashboard, deps.Logger)

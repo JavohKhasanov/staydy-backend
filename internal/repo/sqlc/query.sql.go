@@ -1237,7 +1237,7 @@ INSERT INTO students (
     $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15,
     $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26
 )
-RETURNING id, org_id, name, phone, telegram_id, telegram_chat_id, course_name, group_name, group_id, mentor_name, start_date, onboarding_goal, six_month_target, weekly_study_hours, confidence_level, risk_score, risk_tier, email, birth_date, gender, second_phone, address, parent_name, parent_phone, student_code, status, mentor_id, branch_id, created_at, updated_at
+RETURNING id, org_id, name, phone, password_hash, telegram_id, telegram_chat_id, course_name, group_name, group_id, mentor_name, start_date, onboarding_goal, six_month_target, weekly_study_hours, confidence_level, risk_score, risk_tier, email, birth_date, gender, second_phone, address, parent_name, parent_phone, student_code, status, mentor_id, branch_id, created_at, updated_at
 `
 
 type CreateStudentParams struct {
@@ -1305,6 +1305,7 @@ func (q *Queries) CreateStudent(ctx context.Context, arg CreateStudentParams) (S
 		&i.OrgID,
 		&i.Name,
 		&i.Phone,
+		&i.PasswordHash,
 		&i.TelegramID,
 		&i.TelegramChatID,
 		&i.CourseName,
@@ -2102,7 +2103,7 @@ func (q *Queries) GetSalaryRule(ctx context.Context, teacherID uuid.UUID) (Salar
 }
 
 const getStudent = `-- name: GetStudent :one
-SELECT id, org_id, name, phone, telegram_id, telegram_chat_id, course_name, group_name, group_id, mentor_name, start_date, onboarding_goal, six_month_target, weekly_study_hours, confidence_level, risk_score, risk_tier, email, birth_date, gender, second_phone, address, parent_name, parent_phone, student_code, status, mentor_id, branch_id, created_at, updated_at FROM students WHERE id = $1
+SELECT id, org_id, name, phone, password_hash, telegram_id, telegram_chat_id, course_name, group_name, group_id, mentor_name, start_date, onboarding_goal, six_month_target, weekly_study_hours, confidence_level, risk_score, risk_tier, email, birth_date, gender, second_phone, address, parent_name, parent_phone, student_code, status, mentor_id, branch_id, created_at, updated_at FROM students WHERE id = $1
 `
 
 func (q *Queries) GetStudent(ctx context.Context, id uuid.UUID) (Student, error) {
@@ -2113,6 +2114,7 @@ func (q *Queries) GetStudent(ctx context.Context, id uuid.UUID) (Student, error)
 		&i.OrgID,
 		&i.Name,
 		&i.Phone,
+		&i.PasswordHash,
 		&i.TelegramID,
 		&i.TelegramChatID,
 		&i.CourseName,
@@ -2139,6 +2141,35 @@ func (q *Queries) GetStudent(ctx context.Context, id uuid.UUID) (Student, error)
 		&i.BranchID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getStudentForApp = `-- name: GetStudentForApp :one
+SELECT id, org_id, name, phone, coalesce(course_name, '') AS course_name, coalesce(group_name, '') AS group_name
+FROM students WHERE id = $1
+`
+
+type GetStudentForAppRow struct {
+	ID         uuid.UUID   `json:"id"`
+	OrgID      uuid.UUID   `json:"org_id"`
+	Name       string      `json:"name"`
+	Phone      pgtype.Text `json:"phone"`
+	CourseName string      `json:"course_name"`
+	GroupName  string      `json:"group_name"`
+}
+
+// The signed-in student's own profile (RLS-scoped; id comes from the student JWT).
+func (q *Queries) GetStudentForApp(ctx context.Context, id uuid.UUID) (GetStudentForAppRow, error) {
+	row := q.db.QueryRow(ctx, getStudentForApp, id)
+	var i GetStudentForAppRow
+	err := row.Scan(
+		&i.ID,
+		&i.OrgID,
+		&i.Name,
+		&i.Phone,
+		&i.CourseName,
+		&i.GroupName,
 	)
 	return i, err
 }
@@ -2361,7 +2392,7 @@ func (q *Queries) GroupsMissingAttendance(ctx context.Context, arg GroupsMissing
 }
 
 const highRiskStudents = `-- name: HighRiskStudents :many
-SELECT id, org_id, name, phone, telegram_id, telegram_chat_id, course_name, group_name, group_id, mentor_name, start_date, onboarding_goal, six_month_target, weekly_study_hours, confidence_level, risk_score, risk_tier, email, birth_date, gender, second_phone, address, parent_name, parent_phone, student_code, status, mentor_id, branch_id, created_at, updated_at FROM students
+SELECT id, org_id, name, phone, password_hash, telegram_id, telegram_chat_id, course_name, group_name, group_id, mentor_name, start_date, onboarding_goal, six_month_target, weekly_study_hours, confidence_level, risk_score, risk_tier, email, birth_date, gender, second_phone, address, parent_name, parent_phone, student_code, status, mentor_id, branch_id, created_at, updated_at FROM students
 WHERE risk_tier IN ('Red', 'Yellow')
 ORDER BY risk_score DESC, name ASC
 LIMIT 10
@@ -2381,6 +2412,7 @@ func (q *Queries) HighRiskStudents(ctx context.Context) ([]Student, error) {
 			&i.OrgID,
 			&i.Name,
 			&i.Phone,
+			&i.PasswordHash,
 			&i.TelegramID,
 			&i.TelegramChatID,
 			&i.CourseName,
@@ -3500,7 +3532,7 @@ func (q *Queries) ListStaffUsers(ctx context.Context) ([]User, error) {
 }
 
 const listStudents = `-- name: ListStudents :many
-SELECT id, org_id, name, phone, telegram_id, telegram_chat_id, course_name, group_name, group_id, mentor_name, start_date, onboarding_goal, six_month_target, weekly_study_hours, confidence_level, risk_score, risk_tier, email, birth_date, gender, second_phone, address, parent_name, parent_phone, student_code, status, mentor_id, branch_id, created_at, updated_at FROM students
+SELECT id, org_id, name, phone, password_hash, telegram_id, telegram_chat_id, course_name, group_name, group_id, mentor_name, start_date, onboarding_goal, six_month_target, weekly_study_hours, confidence_level, risk_score, risk_tier, email, birth_date, gender, second_phone, address, parent_name, parent_phone, student_code, status, mentor_id, branch_id, created_at, updated_at FROM students
 ORDER BY risk_score DESC, name ASC
 `
 
@@ -3518,6 +3550,7 @@ func (q *Queries) ListStudents(ctx context.Context) ([]Student, error) {
 			&i.OrgID,
 			&i.Name,
 			&i.Phone,
+			&i.PasswordHash,
 			&i.TelegramID,
 			&i.TelegramChatID,
 			&i.CourseName,
@@ -3556,7 +3589,7 @@ func (q *Queries) ListStudents(ctx context.Context) ([]Student, error) {
 }
 
 const listStudentsByGroup = `-- name: ListStudentsByGroup :many
-SELECT id, org_id, name, phone, telegram_id, telegram_chat_id, course_name, group_name, group_id, mentor_name, start_date, onboarding_goal, six_month_target, weekly_study_hours, confidence_level, risk_score, risk_tier, email, birth_date, gender, second_phone, address, parent_name, parent_phone, student_code, status, mentor_id, branch_id, created_at, updated_at FROM students WHERE group_id = $1 ORDER BY risk_score DESC, name ASC
+SELECT id, org_id, name, phone, password_hash, telegram_id, telegram_chat_id, course_name, group_name, group_id, mentor_name, start_date, onboarding_goal, six_month_target, weekly_study_hours, confidence_level, risk_score, risk_tier, email, birth_date, gender, second_phone, address, parent_name, parent_phone, student_code, status, mentor_id, branch_id, created_at, updated_at FROM students WHERE group_id = $1 ORDER BY risk_score DESC, name ASC
 `
 
 func (q *Queries) ListStudentsByGroup(ctx context.Context, groupID pgtype.UUID) ([]Student, error) {
@@ -3573,6 +3606,7 @@ func (q *Queries) ListStudentsByGroup(ctx context.Context, groupID pgtype.UUID) 
 			&i.OrgID,
 			&i.Name,
 			&i.Phone,
+			&i.PasswordHash,
 			&i.TelegramID,
 			&i.TelegramChatID,
 			&i.CourseName,
@@ -3611,7 +3645,7 @@ func (q *Queries) ListStudentsByGroup(ctx context.Context, groupID pgtype.UUID) 
 }
 
 const listStudentsInGroup = `-- name: ListStudentsInGroup :many
-SELECT s.id, s.org_id, s.name, s.phone, s.telegram_id, s.telegram_chat_id, s.course_name, s.group_name, s.group_id, s.mentor_name, s.start_date, s.onboarding_goal, s.six_month_target, s.weekly_study_hours, s.confidence_level, s.risk_score, s.risk_tier, s.email, s.birth_date, s.gender, s.second_phone, s.address, s.parent_name, s.parent_phone, s.student_code, s.status, s.mentor_id, s.branch_id, s.created_at, s.updated_at FROM students s
+SELECT s.id, s.org_id, s.name, s.phone, s.password_hash, s.telegram_id, s.telegram_chat_id, s.course_name, s.group_name, s.group_id, s.mentor_name, s.start_date, s.onboarding_goal, s.six_month_target, s.weekly_study_hours, s.confidence_level, s.risk_score, s.risk_tier, s.email, s.birth_date, s.gender, s.second_phone, s.address, s.parent_name, s.parent_phone, s.student_code, s.status, s.mentor_id, s.branch_id, s.created_at, s.updated_at FROM students s
 JOIN group_members m ON m.student_id = s.id
 WHERE m.group_id = $1
 ORDER BY s.risk_score DESC, s.name ASC
@@ -3631,6 +3665,7 @@ func (q *Queries) ListStudentsInGroup(ctx context.Context, groupID uuid.UUID) ([
 			&i.OrgID,
 			&i.Name,
 			&i.Phone,
+			&i.PasswordHash,
 			&i.TelegramID,
 			&i.TelegramChatID,
 			&i.CourseName,
@@ -4073,6 +4108,20 @@ func (q *Queries) SetLeadStage(ctx context.Context, arg SetLeadStageParams) (Lea
 		&i.UpdatedAt,
 	)
 	return i, err
+}
+
+const setStudentLoginPassword = `-- name: SetStudentLoginPassword :exec
+UPDATE students SET password_hash = $2, updated_at = now() WHERE id = $1
+`
+
+type SetStudentLoginPasswordParams struct {
+	ID           uuid.UUID `json:"id"`
+	PasswordHash string    `json:"password_hash"`
+}
+
+func (q *Queries) SetStudentLoginPassword(ctx context.Context, arg SetStudentLoginPasswordParams) error {
+	_, err := q.db.Exec(ctx, setStudentLoginPassword, arg.ID, arg.PasswordHash)
+	return err
 }
 
 const setStudentTelegramChat = `-- name: SetStudentTelegramChat :exec
@@ -4772,7 +4821,7 @@ UPDATE students SET
     parent_name = $14, parent_phone = $15, student_code = $16, status = $17, mentor_id = $18,
     branch_id = $19, updated_at = now()
 WHERE org_id = $1 AND id = $20
-RETURNING id, org_id, name, phone, telegram_id, telegram_chat_id, course_name, group_name, group_id, mentor_name, start_date, onboarding_goal, six_month_target, weekly_study_hours, confidence_level, risk_score, risk_tier, email, birth_date, gender, second_phone, address, parent_name, parent_phone, student_code, status, mentor_id, branch_id, created_at, updated_at
+RETURNING id, org_id, name, phone, password_hash, telegram_id, telegram_chat_id, course_name, group_name, group_id, mentor_name, start_date, onboarding_goal, six_month_target, weekly_study_hours, confidence_level, risk_score, risk_tier, email, birth_date, gender, second_phone, address, parent_name, parent_phone, student_code, status, mentor_id, branch_id, created_at, updated_at
 `
 
 type UpdateStudentParams struct {
@@ -4829,6 +4878,7 @@ func (q *Queries) UpdateStudent(ctx context.Context, arg UpdateStudentParams) (S
 		&i.OrgID,
 		&i.Name,
 		&i.Phone,
+		&i.PasswordHash,
 		&i.TelegramID,
 		&i.TelegramChatID,
 		&i.CourseName,

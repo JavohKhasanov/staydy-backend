@@ -136,6 +136,7 @@ CREATE TABLE students (
     org_id             uuid NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
     name               text NOT NULL,
     phone              text,
+    password_hash      text NOT NULL DEFAULT '', -- student mini-app login (phone + password)
     telegram_id        text,
     telegram_chat_id   bigint,
     course_name        text,

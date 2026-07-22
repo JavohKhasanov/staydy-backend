@@ -126,6 +126,18 @@ type GroupMember struct {
 	CreatedAt pgtype.Timestamptz `json:"created_at"`
 }
 
+type HomeworkAssignment struct {
+	ID          uuid.UUID          `json:"id"`
+	OrgID       uuid.UUID          `json:"org_id"`
+	GroupID     uuid.UUID          `json:"group_id"`
+	LessonDate  pgtype.Date        `json:"lesson_date"`
+	Title       string             `json:"title"`
+	Description string             `json:"description"`
+	Deadline    pgtype.Timestamptz `json:"deadline"`
+	MaxScore    int32              `json:"max_score"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+}
+
 type HomeworkRecord struct {
 	ID        uuid.UUID          `json:"id"`
 	OrgID     uuid.UUID          `json:"org_id"`
@@ -133,6 +145,21 @@ type HomeworkRecord struct {
 	Date      pgtype.Date        `json:"date"`
 	IsDone    bool               `json:"is_done"`
 	CreatedAt pgtype.Timestamptz `json:"created_at"`
+}
+
+type HomeworkSubmission struct {
+	ID           uuid.UUID          `json:"id"`
+	OrgID        uuid.UUID          `json:"org_id"`
+	AssignmentID uuid.UUID          `json:"assignment_id"`
+	StudentID    uuid.UUID          `json:"student_id"`
+	Text         string             `json:"text"`
+	Links        string             `json:"links"`
+	Status       string             `json:"status"`
+	Score        pgtype.Int4        `json:"score"`
+	ReviewNote   string             `json:"review_note"`
+	SubmittedAt  pgtype.Timestamptz `json:"submitted_at"`
+	ReviewedAt   pgtype.Timestamptz `json:"reviewed_at"`
+	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`
 }
 
 type InterventionTask struct {

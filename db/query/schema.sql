@@ -215,6 +215,41 @@ CREATE TABLE homework_records (
 );
 CREATE INDEX idx_homework_student ON homework_records(student_id);
 
+-- Homework assignments + submissions (LMS-style): a teacher attaches an assignment to a group;
+-- students submit text + links; the teacher grades (status + score).
+CREATE TABLE homework_assignments (
+    id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    org_id      uuid NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    group_id    uuid NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
+    lesson_date date,
+    title       text NOT NULL,
+    description text NOT NULL DEFAULT '',
+    deadline    timestamptz,
+    max_score   int NOT NULL DEFAULT 100,
+    created_at  timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_hw_assignments_group ON homework_assignments(group_id);
+CREATE INDEX idx_hw_assignments_org ON homework_assignments(org_id);
+
+CREATE TABLE homework_submissions (
+    id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    org_id        uuid NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    assignment_id uuid NOT NULL REFERENCES homework_assignments(id) ON DELETE CASCADE,
+    student_id    uuid NOT NULL,
+    text          text NOT NULL DEFAULT '',
+    links         text NOT NULL DEFAULT '',
+    status        text NOT NULL DEFAULT 'submitted', -- submitted | accepted | rejected
+    score         int,
+    review_note   text NOT NULL DEFAULT '',
+    submitted_at  timestamptz NOT NULL DEFAULT now(),
+    reviewed_at   timestamptz,
+    updated_at    timestamptz NOT NULL DEFAULT now(),
+    UNIQUE (assignment_id, student_id),
+    FOREIGN KEY (org_id, student_id) REFERENCES students (org_id, id) ON DELETE CASCADE
+);
+CREATE INDEX idx_hw_submissions_assignment ON homework_submissions(assignment_id);
+CREATE INDEX idx_hw_submissions_student ON homework_submissions(student_id);
+
 -- Mentor feedback on an AI recommendation (TZ §7.4): one rating per mentor per student, upserted.
 CREATE TABLE ai_advice_feedback (
     id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -520,6 +555,10 @@ ALTER TABLE notes               FORCE ROW LEVEL SECURITY;
 ALTER TABLE intervention_tasks  FORCE ROW LEVEL SECURITY;
 ALTER TABLE group_members ENABLE ROW LEVEL SECURITY;
 ALTER TABLE group_members FORCE ROW LEVEL SECURITY;
+ALTER TABLE homework_assignments  ENABLE ROW LEVEL SECURITY;
+ALTER TABLE homework_assignments  FORCE ROW LEVEL SECURITY;
+ALTER TABLE homework_submissions  ENABLE ROW LEVEL SECURITY;
+ALTER TABLE homework_submissions  FORCE ROW LEVEL SECURITY;
 
 CREATE POLICY org_isolation ON users
     USING (org_id = nullif(current_setting('app.current_org', true), '')::uuid);
@@ -530,6 +569,10 @@ CREATE POLICY org_isolation ON students
 CREATE POLICY org_isolation ON homework_records
     USING (org_id = nullif(current_setting('app.current_org', true), '')::uuid);
 CREATE POLICY org_isolation ON group_members
+    USING (org_id = nullif(current_setting('app.current_org', true), '')::uuid);
+CREATE POLICY org_isolation ON homework_assignments
+    USING (org_id = nullif(current_setting('app.current_org', true), '')::uuid);
+CREATE POLICY org_isolation ON homework_submissions
     USING (org_id = nullif(current_setting('app.current_org', true), '')::uuid);
 CREATE POLICY org_isolation ON attendance_records
     USING (org_id = nullif(current_setting('app.current_org', true), '')::uuid);

@@ -43,6 +43,8 @@ type Querier interface {
 	// --- groups (RLS-scoped: run inside WithTenant) ---
 	CreateGroup(ctx context.Context, arg CreateGroupParams) (Group, error)
 	CreateHomework(ctx context.Context, arg CreateHomeworkParams) (HomeworkRecord, error)
+	// --- homework (assignments + submissions) ---
+	CreateHomeworkAssignment(ctx context.Context, arg CreateHomeworkAssignmentParams) (HomeworkAssignment, error)
 	// ON CONFLICT DO NOTHING (against the one-open-per-student partial index) makes this
 	// idempotent WITHOUT raising 23505, which would otherwise abort the surrounding tx.
 	// A conflict (a task is already open) returns no row → pgx.ErrNoRows for the caller.
@@ -77,6 +79,7 @@ type Querier interface {
 	CreateTeacherUser(ctx context.Context, arg CreateTeacherUserParams) (User, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	DeleteActivity(ctx context.Context, arg DeleteActivityParams) error
+	DeleteAssignment(ctx context.Context, id uuid.UUID) error
 	DeleteBranch(ctx context.Context, id uuid.UUID) error
 	DeleteCourse(ctx context.Context, arg DeleteCourseParams) error
 	DeleteEnrollment(ctx context.Context, arg DeleteEnrollmentParams) error
@@ -102,6 +105,9 @@ type Querier interface {
 	// anyone already invoiced for that group+period. Idempotent — safe to run repeatedly. Due on the
 	// 10th. Returns the number of invoices created.
 	GenerateMonthlyInvoices(ctx context.Context, period string) (int64, error)
+	GetAssignment(ctx context.Context, id uuid.UUID) (HomeworkAssignment, error)
+	// The assignment, only if the student is a member of its group (visibility + submit guard).
+	GetAssignmentForStudent(ctx context.Context, arg GetAssignmentForStudentParams) (HomeworkAssignment, error)
 	GetBotConversation(ctx context.Context, telegramChatID int64) (BotConversation, error)
 	GetCourse(ctx context.Context, arg GetCourseParams) (Course, error)
 	GetGraceLessons(ctx context.Context, id uuid.UUID) (int32, error)
@@ -124,6 +130,7 @@ type Querier interface {
 	// Group members who attended sessions this period but have NO invoice for that group yet
 	// (the "started studying, hasn't been billed" signal; caller applies the grace threshold).
 	GraceOverdueStudents(ctx context.Context, period string) ([]GraceOverdueStudentsRow, error)
+	GradeSubmission(ctx context.Context, arg GradeSubmissionParams) (HomeworkSubmission, error)
 	GroupFinanceByPeriod(ctx context.Context, arg GroupFinanceByPeriodParams) ([]GroupFinanceByPeriodRow, error)
 	// Groups that meet on the given weekday and still have at least one member with NO attendance
 	// record for THIS group on the date — i.e. attendance isn't fully marked yet. The warning persists
@@ -139,12 +146,14 @@ type Querier interface {
 	// NON-RLS: superadmin center list (full rows; the caller filters out the platform org).
 	ListAllOrganizations(ctx context.Context) ([]Organization, error)
 	ListAllPlans(ctx context.Context) ([]Plan, error)
+	ListAssignmentSubmissions(ctx context.Context, dollar_1 uuid.UUID) ([]ListAssignmentSubmissionsRow, error)
 	ListAttendanceByStudent(ctx context.Context, studentID uuid.UUID) ([]AttendanceRecord, error)
 	ListBranches(ctx context.Context, orgID uuid.UUID) ([]Branch, error)
 	ListCourses(ctx context.Context, orgID uuid.UUID) ([]Course, error)
 	ListDebtors(ctx context.Context, orgID uuid.UUID) ([]ListDebtorsRow, error)
 	ListEnrollmentsByStudent(ctx context.Context, studentID uuid.UUID) ([]Enrollment, error)
 	ListExpenses(ctx context.Context, arg ListExpensesParams) ([]Expense, error)
+	ListGroupAssignments(ctx context.Context, dollar_1 uuid.UUID) ([]ListGroupAssignmentsRow, error)
 	ListGroups(ctx context.Context) ([]Group, error)
 	ListGroupsByTeacher(ctx context.Context, teacherID pgtype.UUID) ([]Group, error)
 	ListGroupsForStudent(ctx context.Context, studentID uuid.UUID) ([]Group, error)
@@ -163,6 +172,8 @@ type Querier interface {
 	ListSalarySlips(ctx context.Context, arg ListSalarySlipsParams) ([]ListSalarySlipsRow, error)
 	ListSignupRequests(ctx context.Context) ([]SignupRequest, error)
 	ListStaffUsers(ctx context.Context) ([]User, error)
+	// A student's assignments across all their groups, with their own submission (if any).
+	ListStudentAssignments(ctx context.Context, dollar_1 uuid.UUID) ([]ListStudentAssignmentsRow, error)
 	ListStudents(ctx context.Context) ([]Student, error)
 	ListStudentsByGroup(ctx context.Context, groupID pgtype.UUID) ([]Student, error)
 	ListStudentsInGroup(ctx context.Context, groupID uuid.UUID) ([]Student, error)
@@ -219,6 +230,8 @@ type Querier interface {
 	UpdateUserPassword(ctx context.Context, arg UpdateUserPasswordParams) error
 	UpdateUserProfile(ctx context.Context, arg UpdateUserProfileParams) (User, error)
 	UpsertSalaryRule(ctx context.Context, arg UpsertSalaryRuleParams) (SalaryRule, error)
+	// Student submits (or re-submits) — grading resets to 'submitted'.
+	UpsertSubmission(ctx context.Context, arg UpsertSubmissionParams) (HomeworkSubmission, error)
 }
 
 var _ Querier = (*Queries)(nil)

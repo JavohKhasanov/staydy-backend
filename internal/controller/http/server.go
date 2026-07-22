@@ -33,6 +33,7 @@ import (
 	obstacleusecase "github.com/student-success/backend/internal/usecase/obstacle"
 	planusecase "github.com/student-success/backend/internal/usecase/plan"
 	roomusecase "github.com/student-success/backend/internal/usecase/room"
+	homeworkusecase "github.com/student-success/backend/internal/usecase/homework"
 	salaryusecase "github.com/student-success/backend/internal/usecase/salary"
 	staffusecase "github.com/student-success/backend/internal/usecase/staff"
 	studentauthusecase "github.com/student-success/backend/internal/usecase/studentauth"
@@ -58,6 +59,7 @@ type Dependencies struct {
 	Teachers      *teacherusecase.Service
 	Staff         *staffusecase.Service
 	StudentAuth   *studentauthusecase.Service
+	Homework      *homeworkusecase.Service
 	Obstacles     *obstacleusecase.Service
 	Courses       *courseusecase.Service
 	Enrollments   *enrollmentusecase.Service
@@ -127,6 +129,13 @@ func NewServer(deps Dependencies) *Server {
 	studentAPI.UseMiddleware(RequireAuth(api, deps.TokenManager))
 	studentAPI.UseMiddleware(RequireRole(api, entity.RoleStudent))
 	registerStudentApp(studentAPI, deps.Students, deps.Logger)
+	registerStudentHomework(studentAPI, deps.Homework, deps.Logger)
+
+	// Homework management: teachers (scoped to their own groups in the usecase) plus admins/managers.
+	teachingAPI := huma.NewGroup(api, "/api/v1")
+	teachingAPI.UseMiddleware(RequireAuth(api, deps.TokenManager))
+	teachingAPI.UseMiddleware(RequireRole(api, entity.RoleTeacher, entity.RoleManager, entity.RoleCenterAdmin, entity.RoleSuperAdmin))
+	registerHomework(teachingAPI, deps.Homework, deps.Logger)
 	registerStudents(protectedAPI, deps.Students, deps.Logger)
 	registerInterventions(protectedAPI, deps.Interventions, deps.Logger)
 	registerDashboard(protectedAPI, deps.Dashboard, deps.Logger)

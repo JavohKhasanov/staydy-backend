@@ -624,6 +624,48 @@ func (q *Queries) CreateHomework(ctx context.Context, arg CreateHomeworkParams) 
 	return i, err
 }
 
+const createHomeworkAssignment = `-- name: CreateHomeworkAssignment :one
+
+INSERT INTO homework_assignments (org_id, group_id, lesson_date, title, description, deadline, max_score)
+VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, org_id, group_id, lesson_date, title, description, deadline, max_score, created_at
+`
+
+type CreateHomeworkAssignmentParams struct {
+	OrgID       uuid.UUID          `json:"org_id"`
+	GroupID     uuid.UUID          `json:"group_id"`
+	LessonDate  pgtype.Date        `json:"lesson_date"`
+	Title       string             `json:"title"`
+	Description string             `json:"description"`
+	Deadline    pgtype.Timestamptz `json:"deadline"`
+	MaxScore    int32              `json:"max_score"`
+}
+
+// --- homework (assignments + submissions) ---
+func (q *Queries) CreateHomeworkAssignment(ctx context.Context, arg CreateHomeworkAssignmentParams) (HomeworkAssignment, error) {
+	row := q.db.QueryRow(ctx, createHomeworkAssignment,
+		arg.OrgID,
+		arg.GroupID,
+		arg.LessonDate,
+		arg.Title,
+		arg.Description,
+		arg.Deadline,
+		arg.MaxScore,
+	)
+	var i HomeworkAssignment
+	err := row.Scan(
+		&i.ID,
+		&i.OrgID,
+		&i.GroupID,
+		&i.LessonDate,
+		&i.Title,
+		&i.Description,
+		&i.Deadline,
+		&i.MaxScore,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const createInterventionTask = `-- name: CreateInterventionTask :one
 INSERT INTO intervention_tasks (org_id, student_id, reasons, status)
 VALUES ($1, $2, $3, $4)
@@ -1477,6 +1519,15 @@ func (q *Queries) DeleteActivity(ctx context.Context, arg DeleteActivityParams) 
 	return err
 }
 
+const deleteAssignment = `-- name: DeleteAssignment :exec
+DELETE FROM homework_assignments WHERE id = $1
+`
+
+func (q *Queries) DeleteAssignment(ctx context.Context, id uuid.UUID) error {
+	_, err := q.db.Exec(ctx, deleteAssignment, id)
+	return err
+}
+
 const deleteBranch = `-- name: DeleteBranch :exec
 DELETE FROM branches WHERE id = $1
 `
@@ -1774,6 +1825,56 @@ func (q *Queries) GenerateMonthlyInvoices(ctx context.Context, period string) (i
 		return 0, err
 	}
 	return result.RowsAffected(), nil
+}
+
+const getAssignment = `-- name: GetAssignment :one
+SELECT id, org_id, group_id, lesson_date, title, description, deadline, max_score, created_at FROM homework_assignments WHERE id = $1
+`
+
+func (q *Queries) GetAssignment(ctx context.Context, id uuid.UUID) (HomeworkAssignment, error) {
+	row := q.db.QueryRow(ctx, getAssignment, id)
+	var i HomeworkAssignment
+	err := row.Scan(
+		&i.ID,
+		&i.OrgID,
+		&i.GroupID,
+		&i.LessonDate,
+		&i.Title,
+		&i.Description,
+		&i.Deadline,
+		&i.MaxScore,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const getAssignmentForStudent = `-- name: GetAssignmentForStudent :one
+SELECT a.id, a.org_id, a.group_id, a.lesson_date, a.title, a.description, a.deadline, a.max_score, a.created_at FROM homework_assignments a
+JOIN group_members m ON m.group_id = a.group_id AND m.student_id = $2::uuid
+WHERE a.id = $1
+`
+
+type GetAssignmentForStudentParams struct {
+	ID      uuid.UUID `json:"id"`
+	Column2 uuid.UUID `json:"column_2"`
+}
+
+// The assignment, only if the student is a member of its group (visibility + submit guard).
+func (q *Queries) GetAssignmentForStudent(ctx context.Context, arg GetAssignmentForStudentParams) (HomeworkAssignment, error) {
+	row := q.db.QueryRow(ctx, getAssignmentForStudent, arg.ID, arg.Column2)
+	var i HomeworkAssignment
+	err := row.Scan(
+		&i.ID,
+		&i.OrgID,
+		&i.GroupID,
+		&i.LessonDate,
+		&i.Title,
+		&i.Description,
+		&i.Deadline,
+		&i.MaxScore,
+		&i.CreatedAt,
+	)
+	return i, err
 }
 
 const getBotConversation = `-- name: GetBotConversation :one
@@ -2273,6 +2374,43 @@ func (q *Queries) GraceOverdueStudents(ctx context.Context, period string) ([]Gr
 	return items, nil
 }
 
+const gradeSubmission = `-- name: GradeSubmission :one
+UPDATE homework_submissions SET status = $2, score = $3, review_note = $4, reviewed_at = now(), updated_at = now()
+WHERE id = $1 RETURNING id, org_id, assignment_id, student_id, text, links, status, score, review_note, submitted_at, reviewed_at, updated_at
+`
+
+type GradeSubmissionParams struct {
+	ID         uuid.UUID   `json:"id"`
+	Status     string      `json:"status"`
+	Score      pgtype.Int4 `json:"score"`
+	ReviewNote string      `json:"review_note"`
+}
+
+func (q *Queries) GradeSubmission(ctx context.Context, arg GradeSubmissionParams) (HomeworkSubmission, error) {
+	row := q.db.QueryRow(ctx, gradeSubmission,
+		arg.ID,
+		arg.Status,
+		arg.Score,
+		arg.ReviewNote,
+	)
+	var i HomeworkSubmission
+	err := row.Scan(
+		&i.ID,
+		&i.OrgID,
+		&i.AssignmentID,
+		&i.StudentID,
+		&i.Text,
+		&i.Links,
+		&i.Status,
+		&i.Score,
+		&i.ReviewNote,
+		&i.SubmittedAt,
+		&i.ReviewedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const groupFinanceByPeriod = `-- name: GroupFinanceByPeriod :many
 SELECT s.id AS student_id, s.name AS student_name,
        COALESCE(SUM(i.amount), 0)::bigint  AS invoiced,
@@ -2660,6 +2798,62 @@ func (q *Queries) ListAllPlans(ctx context.Context) ([]Plan, error) {
 	return items, nil
 }
 
+const listAssignmentSubmissions = `-- name: ListAssignmentSubmissions :many
+SELECT s.id, s.org_id, s.assignment_id, s.student_id, s.text, s.links, s.status, s.score, s.review_note, s.submitted_at, s.reviewed_at, s.updated_at, st.name AS student_name FROM homework_submissions s
+JOIN students st ON st.id = s.student_id
+WHERE s.assignment_id = $1::uuid ORDER BY s.submitted_at DESC
+`
+
+type ListAssignmentSubmissionsRow struct {
+	ID           uuid.UUID          `json:"id"`
+	OrgID        uuid.UUID          `json:"org_id"`
+	AssignmentID uuid.UUID          `json:"assignment_id"`
+	StudentID    uuid.UUID          `json:"student_id"`
+	Text         string             `json:"text"`
+	Links        string             `json:"links"`
+	Status       string             `json:"status"`
+	Score        pgtype.Int4        `json:"score"`
+	ReviewNote   string             `json:"review_note"`
+	SubmittedAt  pgtype.Timestamptz `json:"submitted_at"`
+	ReviewedAt   pgtype.Timestamptz `json:"reviewed_at"`
+	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`
+	StudentName  string             `json:"student_name"`
+}
+
+func (q *Queries) ListAssignmentSubmissions(ctx context.Context, dollar_1 uuid.UUID) ([]ListAssignmentSubmissionsRow, error) {
+	rows, err := q.db.Query(ctx, listAssignmentSubmissions, dollar_1)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListAssignmentSubmissionsRow{}
+	for rows.Next() {
+		var i ListAssignmentSubmissionsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.OrgID,
+			&i.AssignmentID,
+			&i.StudentID,
+			&i.Text,
+			&i.Links,
+			&i.Status,
+			&i.Score,
+			&i.ReviewNote,
+			&i.SubmittedAt,
+			&i.ReviewedAt,
+			&i.UpdatedAt,
+			&i.StudentName,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listAttendanceByStudent = `-- name: ListAttendanceByStudent :many
 SELECT id, org_id, student_id, group_id, date, is_present, status, created_at FROM attendance_records
 WHERE student_id = $1
@@ -2863,6 +3057,56 @@ func (q *Queries) ListExpenses(ctx context.Context, arg ListExpensesParams) ([]E
 			&i.Note,
 			&i.BranchID,
 			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listGroupAssignments = `-- name: ListGroupAssignments :many
+SELECT a.id, a.org_id, a.group_id, a.lesson_date, a.title, a.description, a.deadline, a.max_score, a.created_at,
+  (SELECT count(*) FROM homework_submissions s WHERE s.assignment_id = a.id)::bigint AS submission_count
+FROM homework_assignments a WHERE a.group_id = $1::uuid ORDER BY a.created_at DESC
+`
+
+type ListGroupAssignmentsRow struct {
+	ID              uuid.UUID          `json:"id"`
+	OrgID           uuid.UUID          `json:"org_id"`
+	GroupID         uuid.UUID          `json:"group_id"`
+	LessonDate      pgtype.Date        `json:"lesson_date"`
+	Title           string             `json:"title"`
+	Description     string             `json:"description"`
+	Deadline        pgtype.Timestamptz `json:"deadline"`
+	MaxScore        int32              `json:"max_score"`
+	CreatedAt       pgtype.Timestamptz `json:"created_at"`
+	SubmissionCount int64              `json:"submission_count"`
+}
+
+func (q *Queries) ListGroupAssignments(ctx context.Context, dollar_1 uuid.UUID) ([]ListGroupAssignmentsRow, error) {
+	rows, err := q.db.Query(ctx, listGroupAssignments, dollar_1)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListGroupAssignmentsRow{}
+	for rows.Next() {
+		var i ListGroupAssignmentsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.OrgID,
+			&i.GroupID,
+			&i.LessonDate,
+			&i.Title,
+			&i.Description,
+			&i.Deadline,
+			&i.MaxScore,
+			&i.CreatedAt,
+			&i.SubmissionCount,
 		); err != nil {
 			return nil, err
 		}
@@ -3520,6 +3764,74 @@ func (q *Queries) ListStaffUsers(ctx context.Context) ([]User, error) {
 			&i.BranchID,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listStudentAssignments = `-- name: ListStudentAssignments :many
+SELECT a.id, a.group_id, g.name AS group_name, a.lesson_date, a.title, a.description,
+  a.deadline, a.max_score,
+  s.id AS submission_id, coalesce(s.status, '') AS submission_status, s.score,
+  coalesce(s.text, '') AS submission_text, coalesce(s.links, '') AS submission_links,
+  coalesce(s.review_note, '') AS review_note, s.submitted_at
+FROM homework_assignments a
+JOIN groups g ON g.id = a.group_id
+JOIN group_members m ON m.group_id = a.group_id AND m.student_id = $1::uuid
+LEFT JOIN homework_submissions s ON s.assignment_id = a.id AND s.student_id = $1::uuid
+ORDER BY a.deadline DESC NULLS LAST, a.created_at DESC
+`
+
+type ListStudentAssignmentsRow struct {
+	ID               uuid.UUID          `json:"id"`
+	GroupID          uuid.UUID          `json:"group_id"`
+	GroupName        string             `json:"group_name"`
+	LessonDate       pgtype.Date        `json:"lesson_date"`
+	Title            string             `json:"title"`
+	Description      string             `json:"description"`
+	Deadline         pgtype.Timestamptz `json:"deadline"`
+	MaxScore         int32              `json:"max_score"`
+	SubmissionID     pgtype.UUID        `json:"submission_id"`
+	SubmissionStatus string             `json:"submission_status"`
+	Score            pgtype.Int4        `json:"score"`
+	SubmissionText   string             `json:"submission_text"`
+	SubmissionLinks  string             `json:"submission_links"`
+	ReviewNote       string             `json:"review_note"`
+	SubmittedAt      pgtype.Timestamptz `json:"submitted_at"`
+}
+
+// A student's assignments across all their groups, with their own submission (if any).
+func (q *Queries) ListStudentAssignments(ctx context.Context, dollar_1 uuid.UUID) ([]ListStudentAssignmentsRow, error) {
+	rows, err := q.db.Query(ctx, listStudentAssignments, dollar_1)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListStudentAssignmentsRow{}
+	for rows.Next() {
+		var i ListStudentAssignmentsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.GroupID,
+			&i.GroupName,
+			&i.LessonDate,
+			&i.Title,
+			&i.Description,
+			&i.Deadline,
+			&i.MaxScore,
+			&i.SubmissionID,
+			&i.SubmissionStatus,
+			&i.Score,
+			&i.SubmissionText,
+			&i.SubmissionLinks,
+			&i.ReviewNote,
+			&i.SubmittedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -5036,6 +5348,50 @@ func (q *Queries) UpsertSalaryRule(ctx context.Context, arg UpsertSalaryRulePara
 		&i.Rate,
 		&i.BaseAmount,
 		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const upsertSubmission = `-- name: UpsertSubmission :one
+INSERT INTO homework_submissions (org_id, assignment_id, student_id, text, links)
+VALUES ($1, $2, $3, $4, $5)
+ON CONFLICT (assignment_id, student_id) DO UPDATE
+  SET text = EXCLUDED.text, links = EXCLUDED.links, status = 'submitted',
+      score = NULL, review_note = '', reviewed_at = NULL, updated_at = now()
+RETURNING id, org_id, assignment_id, student_id, text, links, status, score, review_note, submitted_at, reviewed_at, updated_at
+`
+
+type UpsertSubmissionParams struct {
+	OrgID        uuid.UUID `json:"org_id"`
+	AssignmentID uuid.UUID `json:"assignment_id"`
+	StudentID    uuid.UUID `json:"student_id"`
+	Text         string    `json:"text"`
+	Links        string    `json:"links"`
+}
+
+// Student submits (or re-submits) — grading resets to 'submitted'.
+func (q *Queries) UpsertSubmission(ctx context.Context, arg UpsertSubmissionParams) (HomeworkSubmission, error) {
+	row := q.db.QueryRow(ctx, upsertSubmission,
+		arg.OrgID,
+		arg.AssignmentID,
+		arg.StudentID,
+		arg.Text,
+		arg.Links,
+	)
+	var i HomeworkSubmission
+	err := row.Scan(
+		&i.ID,
+		&i.OrgID,
+		&i.AssignmentID,
+		&i.StudentID,
+		&i.Text,
+		&i.Links,
+		&i.Status,
+		&i.Score,
+		&i.ReviewNote,
+		&i.SubmittedAt,
+		&i.ReviewedAt,
 		&i.UpdatedAt,
 	)
 	return i, err

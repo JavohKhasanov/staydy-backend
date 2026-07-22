@@ -316,6 +316,60 @@ WHERE id = $1;
 -- name: SetStudentLoginPassword :exec
 UPDATE students SET password_hash = $2, updated_at = now() WHERE id = $1;
 
+-- --- homework (assignments + submissions) ---
+
+-- name: CreateHomeworkAssignment :one
+INSERT INTO homework_assignments (org_id, group_id, lesson_date, title, description, deadline, max_score)
+VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *;
+
+-- name: ListGroupAssignments :many
+SELECT a.*,
+  (SELECT count(*) FROM homework_submissions s WHERE s.assignment_id = a.id)::bigint AS submission_count
+FROM homework_assignments a WHERE a.group_id = $1::uuid ORDER BY a.created_at DESC;
+
+-- name: GetAssignment :one
+SELECT * FROM homework_assignments WHERE id = $1;
+
+-- name: DeleteAssignment :exec
+DELETE FROM homework_assignments WHERE id = $1;
+
+-- name: ListAssignmentSubmissions :many
+SELECT s.*, st.name AS student_name FROM homework_submissions s
+JOIN students st ON st.id = s.student_id
+WHERE s.assignment_id = $1::uuid ORDER BY s.submitted_at DESC;
+
+-- name: GradeSubmission :one
+UPDATE homework_submissions SET status = $2, score = $3, review_note = $4, reviewed_at = now(), updated_at = now()
+WHERE id = $1 RETURNING *;
+
+-- name: GetAssignmentForStudent :one
+-- The assignment, only if the student is a member of its group (visibility + submit guard).
+SELECT a.* FROM homework_assignments a
+JOIN group_members m ON m.group_id = a.group_id AND m.student_id = $2::uuid
+WHERE a.id = $1;
+
+-- name: UpsertSubmission :one
+-- Student submits (or re-submits) — grading resets to 'submitted'.
+INSERT INTO homework_submissions (org_id, assignment_id, student_id, text, links)
+VALUES ($1, $2, $3, $4, $5)
+ON CONFLICT (assignment_id, student_id) DO UPDATE
+  SET text = EXCLUDED.text, links = EXCLUDED.links, status = 'submitted',
+      score = NULL, review_note = '', reviewed_at = NULL, updated_at = now()
+RETURNING *;
+
+-- name: ListStudentAssignments :many
+-- A student's assignments across all their groups, with their own submission (if any).
+SELECT a.id, a.group_id, g.name AS group_name, a.lesson_date, a.title, a.description,
+  a.deadline, a.max_score,
+  s.id AS submission_id, coalesce(s.status, '') AS submission_status, s.score,
+  coalesce(s.text, '') AS submission_text, coalesce(s.links, '') AS submission_links,
+  coalesce(s.review_note, '') AS review_note, s.submitted_at
+FROM homework_assignments a
+JOIN groups g ON g.id = a.group_id
+JOIN group_members m ON m.group_id = a.group_id AND m.student_id = $1::uuid
+LEFT JOIN homework_submissions s ON s.assignment_id = a.id AND s.student_id = $1::uuid
+ORDER BY a.deadline DESC NULLS LAST, a.created_at DESC;
+
 -- name: GetStudentForApp :one
 -- The signed-in student's own profile (RLS-scoped; id comes from the student JWT).
 SELECT id, org_id, name, phone, coalesce(course_name, '') AS course_name, coalesce(group_name, '') AS group_name

@@ -40,6 +40,7 @@ import (
 	signupusecase "github.com/student-success/backend/internal/usecase/signup"
 	studentusecase "github.com/student-success/backend/internal/usecase/student"
 	superadminusecase "github.com/student-success/backend/internal/usecase/superadmin"
+	homeworkusecase "github.com/student-success/backend/internal/usecase/homework"
 	staffusecase "github.com/student-success/backend/internal/usecase/staff"
 	studentauthusecase "github.com/student-success/backend/internal/usecase/studentauth"
 	teacherusecase "github.com/student-success/backend/internal/usecase/teacher"
@@ -85,6 +86,7 @@ func New(ctx context.Context, cfg *config.Config) (*Application, error) {
 	teacherRepo := repopg.NewTeacherRepository(db)
 	staffRepo := repopg.NewStaffRepository(db)
 	studentAuthRepo := repopg.NewStudentAuthRepository(db)
+	assignmentRepo := repopg.NewAssignmentRepository(db)
 
 	geminiClient := gemini.New(cfg.Gemini.APIKey, cfg.Gemini.Model, "")
 	telegramClient := telegram.New(cfg.Telegram.BotToken, "")
@@ -108,6 +110,7 @@ func New(ctx context.Context, cfg *config.Config) (*Application, error) {
 	teacherService := teacherusecase.NewService(teacherRepo)
 	staffService := staffusecase.NewService(staffRepo)
 	studentAuthService := studentauthusecase.NewService(studentAuthRepo, tokenManager)
+	homeworkService := homeworkusecase.NewService(assignmentRepo, groupRepo)
 	obstacleService := obstacleusecase.NewService(repopg.NewObstacleRepository(db))
 	courseService := courseusecase.NewService(repopg.NewCourseRepository(db))
 	enrollmentService := enrollmentusecase.NewService(repopg.NewEnrollmentRepository(db))
@@ -144,6 +147,7 @@ func New(ctx context.Context, cfg *config.Config) (*Application, error) {
 		Teachers:      teacherService,
 		Staff:         staffService,
 		StudentAuth:   studentAuthService,
+		Homework:      homeworkService,
 		Obstacles:     obstacleService,
 		Courses:       courseService,
 		Enrollments:   enrollmentService,

@@ -138,6 +138,29 @@ type StudentAuthRepository interface {
 	LookupByPhone(ctx context.Context, phone string) ([]entity.StudentAccount, error)
 }
 
+// CreateAssignmentParams is a new homework assignment (org_id supplied separately, from the JWT).
+type CreateAssignmentParams struct {
+	GroupID     uuid.UUID
+	LessonDate  *time.Time
+	Title       string
+	Description string
+	Deadline    *time.Time
+	MaxScore    int
+}
+
+// AssignmentRepository persists homework assignments + submissions (LMS-style), RLS-scoped.
+type AssignmentRepository interface {
+	CreateAssignment(ctx context.Context, orgID uuid.UUID, p CreateAssignmentParams) (entity.HomeworkAssignment, error)
+	ListGroupAssignments(ctx context.Context, orgID, groupID uuid.UUID) ([]entity.HomeworkAssignment, error)
+	GetAssignment(ctx context.Context, orgID, id uuid.UUID) (entity.HomeworkAssignment, error)
+	DeleteAssignment(ctx context.Context, orgID, id uuid.UUID) error
+	ListSubmissions(ctx context.Context, orgID, assignmentID uuid.UUID) ([]entity.HomeworkSubmission, error)
+	Grade(ctx context.Context, orgID, submissionID uuid.UUID, status string, score *int, note string) (entity.HomeworkSubmission, error)
+	GetAssignmentForStudent(ctx context.Context, orgID, assignmentID, studentID uuid.UUID) (entity.HomeworkAssignment, error)
+	UpsertSubmission(ctx context.Context, orgID, assignmentID, studentID uuid.UUID, text, links string) (entity.HomeworkSubmission, error)
+	ListStudentAssignments(ctx context.Context, orgID, studentID uuid.UUID) ([]entity.StudentAssignment, error)
+}
+
 // CreateGroupParams / UpdateGroupParams persist a group (org_id supplied separately, from the JWT).
 type CreateGroupParams struct {
 	Name         string

@@ -95,6 +95,21 @@ func int8ToPtr(i pgtype.Int8) *int64 {
 
 func pgInt8(v int64) pgtype.Int8 { return pgtype.Int8{Int64: v, Valid: true} }
 
+func int4ToPtr(i pgtype.Int4) *int {
+	if !i.Valid {
+		return nil
+	}
+	v := int(i.Int32)
+	return &v
+}
+
+func pgInt4Ptr(p *int) pgtype.Int4 {
+	if p == nil {
+		return pgtype.Int4{}
+	}
+	return pgtype.Int4{Int32: int32(*p), Valid: true}
+}
+
 func isUniqueViolation(err error) bool {
 	var pgErr *pgconn.PgError
 	return errors.As(err, &pgErr) && pgErr.Code == "23505"

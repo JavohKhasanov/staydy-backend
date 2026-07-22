@@ -34,7 +34,9 @@ import (
 	planusecase "github.com/student-success/backend/internal/usecase/plan"
 	roomusecase "github.com/student-success/backend/internal/usecase/room"
 	homeworkusecase "github.com/student-success/backend/internal/usecase/homework"
+	pointsusecase "github.com/student-success/backend/internal/usecase/points"
 	salaryusecase "github.com/student-success/backend/internal/usecase/salary"
+	shopusecase "github.com/student-success/backend/internal/usecase/shop"
 	staffusecase "github.com/student-success/backend/internal/usecase/staff"
 	studentauthusecase "github.com/student-success/backend/internal/usecase/studentauth"
 	signupusecase "github.com/student-success/backend/internal/usecase/signup"
@@ -60,6 +62,8 @@ type Dependencies struct {
 	Staff         *staffusecase.Service
 	StudentAuth   *studentauthusecase.Service
 	Homework      *homeworkusecase.Service
+	Shop          *shopusecase.Service
+	Points        *pointsusecase.Service
 	Obstacles     *obstacleusecase.Service
 	Courses       *courseusecase.Service
 	Enrollments   *enrollmentusecase.Service
@@ -130,12 +134,15 @@ func NewServer(deps Dependencies) *Server {
 	studentAPI.UseMiddleware(RequireRole(api, entity.RoleStudent))
 	registerStudentApp(studentAPI, deps.Students, deps.Logger)
 	registerStudentHomework(studentAPI, deps.Homework, deps.Logger)
+	registerStudentShop(studentAPI, deps.Shop, deps.Points, deps.Logger)
 
-	// Homework management: teachers (scoped to their own groups in the usecase) plus admins/managers.
+	// Homework management + the staff leaderboard: teachers (scoped to their own groups) plus
+	// admins/managers.
 	teachingAPI := huma.NewGroup(api, "/api/v1")
 	teachingAPI.UseMiddleware(RequireAuth(api, deps.TokenManager))
 	teachingAPI.UseMiddleware(RequireRole(api, entity.RoleTeacher, entity.RoleManager, entity.RoleCenterAdmin, entity.RoleSuperAdmin))
 	registerHomework(teachingAPI, deps.Homework, deps.Logger)
+	registerLeaderboard(teachingAPI, deps.Points, deps.Logger)
 	registerStudents(protectedAPI, deps.Students, deps.Logger)
 	registerInterventions(protectedAPI, deps.Interventions, deps.Logger)
 	registerDashboard(protectedAPI, deps.Dashboard, deps.Logger)
@@ -172,6 +179,7 @@ func NewServer(deps Dependencies) *Server {
 	centerStaffAPI.UseMiddleware(RequireRole(api, entity.RoleManager, entity.RoleCenterAdmin, entity.RoleSuperAdmin))
 	registerGroups(centerStaffAPI, staffReadAPI, deps.Groups, deps.Logger)
 	registerTeachers(centerStaffAPI, staffReadAPI, deps.Teachers, deps.Logger)
+	registerShop(centerStaffAPI, deps.Shop, deps.Logger)
 	registerObstacleOptions(centerStaffAPI, deps.Obstacles, deps.Logger)
 	registerCourses(centerStaffAPI, deps.Courses, deps.Logger)
 	registerEnrollments(centerStaffAPI, deps.Enrollments, deps.Logger)

@@ -391,6 +391,49 @@ UPDATE students SET xp = xp + $2, coins = coins + $3, updated_at = now() WHERE i
 UPDATE students SET coins = coins - $2, updated_at = now()
 WHERE id = $1 AND coins >= $2 RETURNING coins;
 
+-- --- shop ---
+
+-- name: CreateShopItem :one
+INSERT INTO shop_items (org_id, name, icon, price, is_active)
+VALUES ($1, $2, $3, $4, $5) RETURNING *;
+
+-- name: ListShopItems :many
+SELECT * FROM shop_items ORDER BY created_at DESC;
+
+-- name: GetShopItem :one
+SELECT * FROM shop_items WHERE id = $1;
+
+-- name: UpdateShopItem :one
+UPDATE shop_items SET name = $2, icon = $3, price = $4, is_active = $5 WHERE id = $1 RETURNING *;
+
+-- name: DeleteShopItem :exec
+DELETE FROM shop_items WHERE id = $1;
+
+-- name: ListShopForStudent :many
+-- Active items with whether the student already owns each.
+SELECT i.id, i.name, i.icon, i.price, (p.id IS NOT NULL) AS owned
+FROM shop_items i
+LEFT JOIN shop_purchases p ON p.item_id = i.id AND p.student_id = $1::uuid
+WHERE i.is_active = true
+ORDER BY i.price ASC;
+
+-- name: InsertPurchase :one
+INSERT INTO shop_purchases (org_id, student_id, item_id, price)
+VALUES ($1, $2, $3, $4)
+ON CONFLICT (student_id, item_id) DO NOTHING
+RETURNING id;
+
+-- --- leaderboard ---
+
+-- name: LeaderboardOrg :many
+SELECT id, name, xp, coins FROM students
+WHERE status = 'active' ORDER BY xp DESC, name ASC LIMIT $1;
+
+-- name: LeaderboardGroup :many
+SELECT s.id, s.name, s.xp, s.coins FROM students s
+JOIN group_members m ON m.student_id = s.id AND m.group_id = $1::uuid
+WHERE s.status = 'active' ORDER BY s.xp DESC, s.name ASC LIMIT $2;
+
 -- name: CreateNote :one
 INSERT INTO notes (org_id, student_id, author, text)
 VALUES ($1, $2, $3, $4)

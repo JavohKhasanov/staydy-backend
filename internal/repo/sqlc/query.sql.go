@@ -1202,6 +1202,42 @@ func (q *Queries) CreateSalarySlip(ctx context.Context, arg CreateSalarySlipPara
 	return i, err
 }
 
+const createShopItem = `-- name: CreateShopItem :one
+
+INSERT INTO shop_items (org_id, name, icon, price, is_active)
+VALUES ($1, $2, $3, $4, $5) RETURNING id, org_id, name, icon, price, is_active, created_at
+`
+
+type CreateShopItemParams struct {
+	OrgID    uuid.UUID `json:"org_id"`
+	Name     string    `json:"name"`
+	Icon     string    `json:"icon"`
+	Price    int32     `json:"price"`
+	IsActive bool      `json:"is_active"`
+}
+
+// --- shop ---
+func (q *Queries) CreateShopItem(ctx context.Context, arg CreateShopItemParams) (ShopItem, error) {
+	row := q.db.QueryRow(ctx, createShopItem,
+		arg.OrgID,
+		arg.Name,
+		arg.Icon,
+		arg.Price,
+		arg.IsActive,
+	)
+	var i ShopItem
+	err := row.Scan(
+		&i.ID,
+		&i.OrgID,
+		&i.Name,
+		&i.Icon,
+		&i.Price,
+		&i.IsActive,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const createSignupRequest = `-- name: CreateSignupRequest :one
 INSERT INTO signup_requests (center_name, contact_name, phone, email, plan, message)
 VALUES ($1, $2, $3, $4, $5, $6)
@@ -1715,6 +1751,15 @@ func (q *Queries) DeleteSalarySlip(ctx context.Context, id uuid.UUID) error {
 	return err
 }
 
+const deleteShopItem = `-- name: DeleteShopItem :exec
+DELETE FROM shop_items WHERE id = $1
+`
+
+func (q *Queries) DeleteShopItem(ctx context.Context, id uuid.UUID) error {
+	_, err := q.db.Exec(ctx, deleteShopItem, id)
+	return err
+}
+
 const deleteStaffUser = `-- name: DeleteStaffUser :exec
 DELETE FROM users WHERE id = $1 AND role IN ('center_admin', 'manager', 'finance')
 `
@@ -2220,6 +2265,25 @@ func (q *Queries) GetSalaryRule(ctx context.Context, teacherID uuid.UUID) (Salar
 	return i, err
 }
 
+const getShopItem = `-- name: GetShopItem :one
+SELECT id, org_id, name, icon, price, is_active, created_at FROM shop_items WHERE id = $1
+`
+
+func (q *Queries) GetShopItem(ctx context.Context, id uuid.UUID) (ShopItem, error) {
+	row := q.db.QueryRow(ctx, getShopItem, id)
+	var i ShopItem
+	err := row.Scan(
+		&i.ID,
+		&i.OrgID,
+		&i.Name,
+		&i.Icon,
+		&i.Price,
+		&i.IsActive,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const getStudent = `-- name: GetStudent :one
 SELECT id, org_id, name, phone, password_hash, xp, coins, telegram_id, telegram_chat_id, course_name, group_name, group_id, mentor_name, start_date, onboarding_goal, six_month_target, weekly_study_hours, confidence_level, risk_score, risk_tier, email, birth_date, gender, second_phone, address, parent_name, parent_phone, student_code, status, mentor_id, branch_id, created_at, updated_at FROM students WHERE id = $1
 `
@@ -2645,6 +2709,32 @@ func (q *Queries) InsertPointsIfNew(ctx context.Context, arg InsertPointsIfNewPa
 	return id, err
 }
 
+const insertPurchase = `-- name: InsertPurchase :one
+INSERT INTO shop_purchases (org_id, student_id, item_id, price)
+VALUES ($1, $2, $3, $4)
+ON CONFLICT (student_id, item_id) DO NOTHING
+RETURNING id
+`
+
+type InsertPurchaseParams struct {
+	OrgID     uuid.UUID `json:"org_id"`
+	StudentID uuid.UUID `json:"student_id"`
+	ItemID    uuid.UUID `json:"item_id"`
+	Price     int32     `json:"price"`
+}
+
+func (q *Queries) InsertPurchase(ctx context.Context, arg InsertPurchaseParams) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, insertPurchase,
+		arg.OrgID,
+		arg.StudentID,
+		arg.ItemID,
+		arg.Price,
+	)
+	var id uuid.UUID
+	err := row.Scan(&id)
+	return id, err
+}
+
 const insertSalaryGroupRule = `-- name: InsertSalaryGroupRule :one
 INSERT INTO salary_group_rules (org_id, teacher_id, group_id, kind, rate)
 VALUES ($1, $2, $3, $4, $5)
@@ -2679,6 +2769,88 @@ func (q *Queries) InsertSalaryGroupRule(ctx context.Context, arg InsertSalaryGro
 		&i.UpdatedAt,
 	)
 	return i, err
+}
+
+const leaderboardGroup = `-- name: LeaderboardGroup :many
+SELECT s.id, s.name, s.xp, s.coins FROM students s
+JOIN group_members m ON m.student_id = s.id AND m.group_id = $1::uuid
+WHERE s.status = 'active' ORDER BY s.xp DESC, s.name ASC LIMIT $2
+`
+
+type LeaderboardGroupParams struct {
+	Column1 uuid.UUID `json:"column_1"`
+	Limit   int32     `json:"limit"`
+}
+
+type LeaderboardGroupRow struct {
+	ID    uuid.UUID `json:"id"`
+	Name  string    `json:"name"`
+	Xp    int32     `json:"xp"`
+	Coins int32     `json:"coins"`
+}
+
+func (q *Queries) LeaderboardGroup(ctx context.Context, arg LeaderboardGroupParams) ([]LeaderboardGroupRow, error) {
+	rows, err := q.db.Query(ctx, leaderboardGroup, arg.Column1, arg.Limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []LeaderboardGroupRow{}
+	for rows.Next() {
+		var i LeaderboardGroupRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.Xp,
+			&i.Coins,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const leaderboardOrg = `-- name: LeaderboardOrg :many
+
+SELECT id, name, xp, coins FROM students
+WHERE status = 'active' ORDER BY xp DESC, name ASC LIMIT $1
+`
+
+type LeaderboardOrgRow struct {
+	ID    uuid.UUID `json:"id"`
+	Name  string    `json:"name"`
+	Xp    int32     `json:"xp"`
+	Coins int32     `json:"coins"`
+}
+
+// --- leaderboard ---
+func (q *Queries) LeaderboardOrg(ctx context.Context, limit int32) ([]LeaderboardOrgRow, error) {
+	rows, err := q.db.Query(ctx, leaderboardOrg, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []LeaderboardOrgRow{}
+	for rows.Next() {
+		var i LeaderboardOrgRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.Xp,
+			&i.Coins,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listActivePlans = `-- name: ListActivePlans :many
@@ -3751,6 +3923,81 @@ func (q *Queries) ListSalarySlips(ctx context.Context, arg ListSalarySlipsParams
 			&i.PaidAt,
 			&i.CreatedAt,
 			&i.TeacherName,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listShopForStudent = `-- name: ListShopForStudent :many
+SELECT i.id, i.name, i.icon, i.price, (p.id IS NOT NULL) AS owned
+FROM shop_items i
+LEFT JOIN shop_purchases p ON p.item_id = i.id AND p.student_id = $1::uuid
+WHERE i.is_active = true
+ORDER BY i.price ASC
+`
+
+type ListShopForStudentRow struct {
+	ID    uuid.UUID   `json:"id"`
+	Name  string      `json:"name"`
+	Icon  string      `json:"icon"`
+	Price int32       `json:"price"`
+	Owned interface{} `json:"owned"`
+}
+
+// Active items with whether the student already owns each.
+func (q *Queries) ListShopForStudent(ctx context.Context, dollar_1 uuid.UUID) ([]ListShopForStudentRow, error) {
+	rows, err := q.db.Query(ctx, listShopForStudent, dollar_1)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListShopForStudentRow{}
+	for rows.Next() {
+		var i ListShopForStudentRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.Icon,
+			&i.Price,
+			&i.Owned,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listShopItems = `-- name: ListShopItems :many
+SELECT id, org_id, name, icon, price, is_active, created_at FROM shop_items ORDER BY created_at DESC
+`
+
+func (q *Queries) ListShopItems(ctx context.Context) ([]ShopItem, error) {
+	rows, err := q.db.Query(ctx, listShopItems)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ShopItem{}
+	for rows.Next() {
+		var i ShopItem
+		if err := rows.Scan(
+			&i.ID,
+			&i.OrgID,
+			&i.Name,
+			&i.Icon,
+			&i.Price,
+			&i.IsActive,
+			&i.CreatedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -5139,6 +5386,39 @@ func (q *Queries) UpdateRoom(ctx context.Context, arg UpdateRoomParams) (Room, e
 		&i.BranchID,
 		&i.Name,
 		&i.Capacity,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const updateShopItem = `-- name: UpdateShopItem :one
+UPDATE shop_items SET name = $2, icon = $3, price = $4, is_active = $5 WHERE id = $1 RETURNING id, org_id, name, icon, price, is_active, created_at
+`
+
+type UpdateShopItemParams struct {
+	ID       uuid.UUID `json:"id"`
+	Name     string    `json:"name"`
+	Icon     string    `json:"icon"`
+	Price    int32     `json:"price"`
+	IsActive bool      `json:"is_active"`
+}
+
+func (q *Queries) UpdateShopItem(ctx context.Context, arg UpdateShopItemParams) (ShopItem, error) {
+	row := q.db.QueryRow(ctx, updateShopItem,
+		arg.ID,
+		arg.Name,
+		arg.Icon,
+		arg.Price,
+		arg.IsActive,
+	)
+	var i ShopItem
+	err := row.Scan(
+		&i.ID,
+		&i.OrgID,
+		&i.Name,
+		&i.Icon,
+		&i.Price,
+		&i.IsActive,
 		&i.CreatedAt,
 	)
 	return i, err

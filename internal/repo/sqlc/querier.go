@@ -69,6 +69,8 @@ type Querier interface {
 	CreateRefreshSession(ctx context.Context, arg CreateRefreshSessionParams) (RefreshSession, error)
 	CreateRoom(ctx context.Context, arg CreateRoomParams) (Room, error)
 	CreateSalarySlip(ctx context.Context, arg CreateSalarySlipParams) (SalarySlip, error)
+	// --- shop ---
+	CreateShopItem(ctx context.Context, arg CreateShopItemParams) (ShopItem, error)
 	CreateSignupRequest(ctx context.Context, arg CreateSignupRequestParams) (SignupRequest, error)
 	// Create a back-office staff account (administrator or finance). Role is a parameter, unlike the
 	// teacher path; the usecase restricts it to allowed staff roles.
@@ -96,6 +98,7 @@ type Querier interface {
 	DeletePlan(ctx context.Context, id uuid.UUID) error
 	DeleteRoom(ctx context.Context, id uuid.UUID) error
 	DeleteSalarySlip(ctx context.Context, id uuid.UUID) error
+	DeleteShopItem(ctx context.Context, id uuid.UUID) error
 	DeleteStaffUser(ctx context.Context, id uuid.UUID) error
 	DeleteStudent(ctx context.Context, id uuid.UUID) error
 	DeleteTeacher(ctx context.Context, id uuid.UUID) error
@@ -123,6 +126,7 @@ type Querier interface {
 	GetPayment(ctx context.Context, arg GetPaymentParams) (Payment, error)
 	GetRefreshSessionByHash(ctx context.Context, tokenHash string) (RefreshSession, error)
 	GetSalaryRule(ctx context.Context, teacherID uuid.UUID) (SalaryRule, error)
+	GetShopItem(ctx context.Context, id uuid.UUID) (ShopItem, error)
 	GetStudent(ctx context.Context, id uuid.UUID) (Student, error)
 	// The signed-in student's own profile + gamification (RLS-scoped; id comes from the student JWT).
 	GetStudentForApp(ctx context.Context, id uuid.UUID) (GetStudentForAppRow, error)
@@ -141,7 +145,11 @@ type Querier interface {
 	HighRiskStudents(ctx context.Context) ([]Student, error)
 	// Idempotent award: no-op (no row returned) when this (kind, ref) already exists for the student.
 	InsertPointsIfNew(ctx context.Context, arg InsertPointsIfNewParams) (uuid.UUID, error)
+	InsertPurchase(ctx context.Context, arg InsertPurchaseParams) (uuid.UUID, error)
 	InsertSalaryGroupRule(ctx context.Context, arg InsertSalaryGroupRuleParams) (SalaryGroupRule, error)
+	LeaderboardGroup(ctx context.Context, arg LeaderboardGroupParams) ([]LeaderboardGroupRow, error)
+	// --- leaderboard ---
+	LeaderboardOrg(ctx context.Context, limit int32) ([]LeaderboardOrgRow, error)
 	ListActivePlans(ctx context.Context) ([]Plan, error)
 	ListActivities(ctx context.Context, arg ListActivitiesParams) ([]Activity, error)
 	// NON-RLS: used by the cross-tenant scheduler to iterate every center.
@@ -173,6 +181,9 @@ type Querier interface {
 	ListRooms(ctx context.Context, orgID uuid.UUID) ([]Room, error)
 	ListSalaryGroupRules(ctx context.Context, dollar_1 uuid.UUID) ([]SalaryGroupRule, error)
 	ListSalarySlips(ctx context.Context, arg ListSalarySlipsParams) ([]ListSalarySlipsRow, error)
+	// Active items with whether the student already owns each.
+	ListShopForStudent(ctx context.Context, dollar_1 uuid.UUID) ([]ListShopForStudentRow, error)
+	ListShopItems(ctx context.Context) ([]ShopItem, error)
 	ListSignupRequests(ctx context.Context) ([]SignupRequest, error)
 	ListStaffUsers(ctx context.Context) ([]User, error)
 	// A student's assignments across all their groups, with their own submission (if any).
@@ -225,6 +236,7 @@ type Querier interface {
 	UpdateOrgPlanStatus(ctx context.Context, arg UpdateOrgPlanStatusParams) (Organization, error)
 	UpdatePlan(ctx context.Context, arg UpdatePlanParams) (Plan, error)
 	UpdateRoom(ctx context.Context, arg UpdateRoomParams) (Room, error)
+	UpdateShopItem(ctx context.Context, arg UpdateShopItemParams) (ShopItem, error)
 	UpdateSignupRequestStatus(ctx context.Context, arg UpdateSignupRequestStatusParams) (SignupRequest, error)
 	UpdateStaffUser(ctx context.Context, arg UpdateStaffUserParams) (User, error)
 	// General profile edit (name, contact, identity, onboarding, status, mentor). Risk fields and

@@ -344,6 +344,25 @@ type SalarySlip struct {
 	CreatedAt   pgtype.Timestamptz `json:"created_at"`
 }
 
+type ShopItem struct {
+	ID        uuid.UUID          `json:"id"`
+	OrgID     uuid.UUID          `json:"org_id"`
+	Name      string             `json:"name"`
+	Icon      string             `json:"icon"`
+	Price     int32              `json:"price"`
+	IsActive  bool               `json:"is_active"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+}
+
+type ShopPurchase struct {
+	ID        uuid.UUID          `json:"id"`
+	OrgID     uuid.UUID          `json:"org_id"`
+	StudentID uuid.UUID          `json:"student_id"`
+	ItemID    uuid.UUID          `json:"item_id"`
+	Price     int32              `json:"price"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+}
+
 type SignupRequest struct {
 	ID          uuid.UUID          `json:"id"`
 	CenterName  string             `json:"center_name"`

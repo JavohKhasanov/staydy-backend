@@ -140,10 +140,23 @@ type StudentAuthRepository interface {
 	LookupByPhone(ctx context.Context, phone string) ([]entity.StudentAccount, error)
 }
 
-// PointsRepository records gamification awards/spends and keeps student XP/coin totals in sync.
+// PointsRepository records gamification awards/spends and reads leaderboards.
 type PointsRepository interface {
 	Award(ctx context.Context, orgID, studentID uuid.UUID, kind string, xp, coins int, ref string) (bool, error)
 	Spend(ctx context.Context, orgID, studentID uuid.UUID, coins int, ref string) error
+	Leaderboard(ctx context.Context, orgID uuid.UUID, limit int) ([]entity.LeaderRow, error)
+	LeaderboardByGroup(ctx context.Context, orgID, groupID uuid.UUID, limit int) ([]entity.LeaderRow, error)
+}
+
+// ShopRepository persists reward-shop items + purchases, RLS-scoped.
+type ShopRepository interface {
+	CreateItem(ctx context.Context, orgID uuid.UUID, name, icon string, price int, active bool) (entity.ShopItem, error)
+	ListItems(ctx context.Context, orgID uuid.UUID) ([]entity.ShopItem, error)
+	GetItem(ctx context.Context, orgID, id uuid.UUID) (entity.ShopItem, error)
+	UpdateItem(ctx context.Context, orgID, id uuid.UUID, name, icon string, price int, active bool) (entity.ShopItem, error)
+	DeleteItem(ctx context.Context, orgID, id uuid.UUID) error
+	ListForStudent(ctx context.Context, orgID, studentID uuid.UUID) ([]entity.StudentShopItem, error)
+	BuyItem(ctx context.Context, orgID, studentID, itemID uuid.UUID, price int) error
 }
 
 // CreateAssignmentParams is a new homework assignment (org_id supplied separately, from the JWT).

@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
+	"github.com/student-success/backend/internal/entity"
 	"github.com/student-success/backend/internal/platform/postgres"
 	"github.com/student-success/backend/internal/repo"
 	"github.com/student-success/backend/internal/repo/sqlc"
@@ -61,4 +62,38 @@ func (r *PointsRepository) Spend(ctx context.Context, orgID, studentID uuid.UUID
 		}
 		return e
 	})
+}
+
+// Leaderboard returns the top active students by XP for the whole center.
+func (r *PointsRepository) Leaderboard(ctx context.Context, orgID uuid.UUID, limit int) ([]entity.LeaderRow, error) {
+	var out []entity.LeaderRow
+	err := r.db.WithTenant(ctx, orgID.String(), func(tx pgx.Tx) error {
+		rows, e := sqlc.New(tx).LeaderboardOrg(ctx, int32(limit))
+		if e != nil {
+			return e
+		}
+		out = make([]entity.LeaderRow, 0, len(rows))
+		for i, row := range rows {
+			out = append(out, entity.LeaderRow{StudentID: row.ID, Name: row.Name, XP: int(row.Xp), Coins: int(row.Coins), Rank: i + 1})
+		}
+		return nil
+	})
+	return out, err
+}
+
+// LeaderboardByGroup returns the top active students by XP within one group.
+func (r *PointsRepository) LeaderboardByGroup(ctx context.Context, orgID, groupID uuid.UUID, limit int) ([]entity.LeaderRow, error) {
+	var out []entity.LeaderRow
+	err := r.db.WithTenant(ctx, orgID.String(), func(tx pgx.Tx) error {
+		rows, e := sqlc.New(tx).LeaderboardGroup(ctx, sqlc.LeaderboardGroupParams{Column1: groupID, Limit: int32(limit)})
+		if e != nil {
+			return e
+		}
+		out = make([]entity.LeaderRow, 0, len(rows))
+		for i, row := range rows {
+			out = append(out, entity.LeaderRow{StudentID: row.ID, Name: row.Name, XP: int(row.Xp), Coins: int(row.Coins), Rank: i + 1})
+		}
+		return nil
+	})
+	return out, err
 }

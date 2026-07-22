@@ -42,6 +42,7 @@ import (
 	superadminusecase "github.com/student-success/backend/internal/usecase/superadmin"
 	homeworkusecase "github.com/student-success/backend/internal/usecase/homework"
 	"github.com/student-success/backend/internal/usecase/points"
+	shopusecase "github.com/student-success/backend/internal/usecase/shop"
 	staffusecase "github.com/student-success/backend/internal/usecase/staff"
 	studentauthusecase "github.com/student-success/backend/internal/usecase/studentauth"
 	teacherusecase "github.com/student-success/backend/internal/usecase/teacher"
@@ -89,6 +90,7 @@ func New(ctx context.Context, cfg *config.Config) (*Application, error) {
 	studentAuthRepo := repopg.NewStudentAuthRepository(db)
 	assignmentRepo := repopg.NewAssignmentRepository(db)
 	pointsRepo := repopg.NewPointsRepository(db)
+	shopRepo := repopg.NewShopRepository(db)
 
 	geminiClient := gemini.New(cfg.Gemini.APIKey, cfg.Gemini.Model, "")
 	telegramClient := telegram.New(cfg.Telegram.BotToken, "")
@@ -115,6 +117,7 @@ func New(ctx context.Context, cfg *config.Config) (*Application, error) {
 	homeworkService := homeworkusecase.NewService(assignmentRepo, groupRepo)
 	// Gamification: award XP/coins as a side-effect of attendance, homework, and check-ins.
 	pointsService := points.NewService(pointsRepo)
+	shopService := shopusecase.NewService(shopRepo)
 	studentService.SetAwarder(pointsService)
 	homeworkService.SetAwarder(pointsService)
 	obstacleService := obstacleusecase.NewService(repopg.NewObstacleRepository(db))
@@ -154,6 +157,8 @@ func New(ctx context.Context, cfg *config.Config) (*Application, error) {
 		Staff:         staffService,
 		StudentAuth:   studentAuthService,
 		Homework:      homeworkService,
+		Shop:          shopService,
+		Points:        pointsService,
 		Obstacles:     obstacleService,
 		Courses:       courseService,
 		Enrollments:   enrollmentService,

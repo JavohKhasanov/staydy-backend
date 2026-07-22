@@ -51,3 +51,25 @@ func (s *Service) AwardCheckin(ctx context.Context, orgID, studentID uuid.UUID, 
 	_, err := s.repo.Award(ctx, orgID, studentID, entity.PointCheckin, entity.XPCheckin, entity.CoinsCheckin, strconv.Itoa(week))
 	return err
 }
+
+// Leaderboard returns the top students by XP, center-wide or within a group, with the caller's own
+// row flagged (meID may be uuid.Nil for a back-office viewer).
+func (s *Service) Leaderboard(ctx context.Context, orgID uuid.UUID, groupID *uuid.UUID, meID uuid.UUID) ([]entity.LeaderRow, error) {
+	const limit = 100
+	var rows []entity.LeaderRow
+	var err error
+	if groupID != nil {
+		rows, err = s.repo.LeaderboardByGroup(ctx, orgID, *groupID, limit)
+	} else {
+		rows, err = s.repo.Leaderboard(ctx, orgID, limit)
+	}
+	if err != nil {
+		return nil, err
+	}
+	for i := range rows {
+		if rows[i].StudentID == meID {
+			rows[i].IsMe = true
+		}
+	}
+	return rows, nil
+}

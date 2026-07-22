@@ -137,6 +137,8 @@ CREATE TABLE students (
     name               text NOT NULL,
     phone              text,
     password_hash      text NOT NULL DEFAULT '', -- student mini-app login (phone + password)
+    xp                 int  NOT NULL DEFAULT 0,   -- gamification: cached total XP
+    coins              int  NOT NULL DEFAULT 0,   -- gamification: spendable coin balance
     telegram_id        text,
     telegram_chat_id   bigint,
     course_name        text,
@@ -249,6 +251,21 @@ CREATE TABLE homework_submissions (
 );
 CREATE INDEX idx_hw_submissions_assignment ON homework_submissions(assignment_id);
 CREATE INDEX idx_hw_submissions_student ON homework_submissions(student_id);
+
+-- Gamification points ledger (append-only; idempotent via the unique key).
+CREATE TABLE student_points (
+    id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    org_id     uuid NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    student_id uuid NOT NULL,
+    kind       text NOT NULL,
+    xp         int NOT NULL DEFAULT 0,
+    coins      int NOT NULL DEFAULT 0,
+    ref        text NOT NULL DEFAULT '',
+    created_at timestamptz NOT NULL DEFAULT now(),
+    UNIQUE (org_id, student_id, kind, ref),
+    FOREIGN KEY (org_id, student_id) REFERENCES students (org_id, id) ON DELETE CASCADE
+);
+CREATE INDEX idx_student_points_student ON student_points(student_id);
 
 -- Mentor feedback on an AI recommendation (TZ §7.4): one rating per mentor per student, upserted.
 CREATE TABLE ai_advice_feedback (
@@ -559,6 +576,8 @@ ALTER TABLE homework_assignments  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE homework_assignments  FORCE ROW LEVEL SECURITY;
 ALTER TABLE homework_submissions  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE homework_submissions  FORCE ROW LEVEL SECURITY;
+ALTER TABLE student_points        ENABLE ROW LEVEL SECURITY;
+ALTER TABLE student_points        FORCE ROW LEVEL SECURITY;
 
 CREATE POLICY org_isolation ON users
     USING (org_id = nullif(current_setting('app.current_org', true), '')::uuid);
@@ -573,6 +592,8 @@ CREATE POLICY org_isolation ON group_members
 CREATE POLICY org_isolation ON homework_assignments
     USING (org_id = nullif(current_setting('app.current_org', true), '')::uuid);
 CREATE POLICY org_isolation ON homework_submissions
+    USING (org_id = nullif(current_setting('app.current_org', true), '')::uuid);
+CREATE POLICY org_isolation ON student_points
     USING (org_id = nullif(current_setting('app.current_org', true), '')::uuid);
 CREATE POLICY org_isolation ON attendance_records
     USING (org_id = nullif(current_setting('app.current_org', true), '')::uuid);

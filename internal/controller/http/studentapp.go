@@ -9,6 +9,7 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/rs/zerolog"
 
+	"github.com/student-success/backend/internal/entity"
 	studentusecase "github.com/student-success/backend/internal/usecase/student"
 	studentauthusecase "github.com/student-success/backend/internal/usecase/studentauth"
 )
@@ -38,6 +39,11 @@ type studentProfileOutput struct {
 		Phone      string `json:"phone"`
 		CourseName string `json:"courseName,omitempty"`
 		GroupName  string `json:"groupName,omitempty"`
+		XP         int    `json:"xp"`
+		Coins      int    `json:"coins"`
+		Level      int    `json:"level"`
+		XPIntoLevel int   `json:"xpIntoLevel"`
+		XPPerLevel int    `json:"xpPerLevel"`
 	}
 }
 
@@ -69,9 +75,38 @@ func registerStudentAuth(api huma.API, svc *studentauthusecase.Service, log zero
 	})
 }
 
+type studentCheckinInput struct {
+	Body struct {
+		Motivation int    `json:"motivation" minimum:"1" maximum:"5"`
+		Progress   int    `json:"progress" minimum:"1" maximum:"5"`
+		Obstacle   string `json:"obstacle,omitempty" maxLength:"120"`
+		Comment    string `json:"comment,omitempty" maxLength:"1000"`
+	}
+}
+
 // registerStudentApp mounts the signed-in student's own endpoints. Mount on a group gated to the
 // student role.
 func registerStudentApp(api huma.API, svc *studentusecase.Service, log zerolog.Logger) {
+	Register(api, BearerOperation(huma.Operation{
+		OperationID:   "student-checkin",
+		Method:        http.MethodPost,
+		Path:          "/student/checkin",
+		Summary:       "Weekly check-in (motivation/progress/obstacle) — feeds the early-warning signals and awards XP",
+		Tags:          []string{"student"},
+		DefaultStatus: http.StatusNoContent,
+		Errors:        []int{http.StatusUnprocessableEntity, http.StatusUnauthorized, http.StatusInternalServerError},
+	}), func(ctx context.Context, in *studentCheckinInput) (*noContentOutput, error) {
+		p, err := principal(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if _, err := svc.SubmitWeeklySurvey(ctx, p.OrgID, p.UserID, in.Body.Motivation, in.Body.Progress, in.Body.Obstacle, in.Body.Comment); err != nil {
+			log.Error().Err(err).Msg("student checkin failed")
+			return nil, huma.Error500InternalServerError("internal error")
+		}
+		return &noContentOutput{}, nil
+	})
+
 	Register(api, BearerOperation(huma.Operation{
 		OperationID: "student-me",
 		Method:      http.MethodGet,
@@ -95,6 +130,11 @@ func registerStudentApp(api huma.API, svc *studentusecase.Service, log zerolog.L
 		out.Body.Phone = prof.Phone
 		out.Body.CourseName = prof.CourseName
 		out.Body.GroupName = prof.GroupName
+		out.Body.XP = prof.XP
+		out.Body.Coins = prof.Coins
+		out.Body.Level = entity.Level(prof.XP)
+		out.Body.XPIntoLevel = entity.XPIntoLevel(prof.XP)
+		out.Body.XPPerLevel = entity.XPPerLevel
 		return out, nil
 	})
 }

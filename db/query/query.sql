@@ -371,9 +371,25 @@ LEFT JOIN homework_submissions s ON s.assignment_id = a.id AND s.student_id = $1
 ORDER BY a.deadline DESC NULLS LAST, a.created_at DESC;
 
 -- name: GetStudentForApp :one
--- The signed-in student's own profile (RLS-scoped; id comes from the student JWT).
-SELECT id, org_id, name, phone, coalesce(course_name, '') AS course_name, coalesce(group_name, '') AS group_name
+-- The signed-in student's own profile + gamification (RLS-scoped; id comes from the student JWT).
+SELECT id, org_id, name, phone, xp, coins,
+  coalesce(course_name, '') AS course_name, coalesce(group_name, '') AS group_name
 FROM students WHERE id = $1;
+
+-- name: InsertPointsIfNew :one
+-- Idempotent award: no-op (no row returned) when this (kind, ref) already exists for the student.
+INSERT INTO student_points (org_id, student_id, kind, xp, coins, ref)
+VALUES ($1, $2, $3, $4, $5, $6)
+ON CONFLICT (org_id, student_id, kind, ref) DO NOTHING
+RETURNING id;
+
+-- name: AddStudentPoints :exec
+UPDATE students SET xp = xp + $2, coins = coins + $3, updated_at = now() WHERE id = $1;
+
+-- name: SpendStudentCoins :one
+-- Deduct coins only if the balance covers it (returns the row when it succeeded).
+UPDATE students SET coins = coins - $2, updated_at = now()
+WHERE id = $1 AND coins >= $2 RETURNING coins;
 
 -- name: CreateNote :one
 INSERT INTO notes (org_id, student_id, author, text)

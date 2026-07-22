@@ -161,6 +161,7 @@ func (r *StudentRepository) Profile(ctx context.Context, orgID, id uuid.UUID) (e
 		p = entity.StudentProfile{
 			ID: row.ID, OrgID: row.OrgID, Name: row.Name, Phone: textToString(row.Phone),
 			CourseName: row.CourseName, GroupName: row.GroupName,
+			XP: int(row.Xp), Coins: int(row.Coins),
 		}
 		return nil
 	})

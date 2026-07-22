@@ -104,12 +104,20 @@ type Detail struct {
 	Factors    []risk.Factor
 }
 
+// Awarder grants gamification points for attended lessons and completed check-ins (satisfied by the
+// points service). Optional — nil means no gamification.
+type Awarder interface {
+	AwardAttendance(ctx context.Context, orgID, studentID, groupID uuid.UUID, date time.Time) error
+	AwardCheckin(ctx context.Context, orgID, studentID uuid.UUID, week int) error
+}
+
 type Service struct {
 	students   repo.StudentRepository
 	surveys    repo.SurveyRepository
 	attendance repo.AttendanceRepository
 	homework   repo.HomeworkRepository
 	retention  repo.RetentionRepository
+	awarder    Awarder
 }
 
 func NewService(
@@ -121,6 +129,9 @@ func NewService(
 ) *Service {
 	return &Service{students: students, surveys: surveys, attendance: attendance, homework: homework, retention: retention}
 }
+
+// SetAwarder wires gamification (call once at startup). Safe to leave unset.
+func (s *Service) SetAwarder(a Awarder) { s.awarder = a }
 
 // Create validates the onboarding data, computes the initial risk score (no attendance or
 // surveys yet), and persists the student.
@@ -330,13 +341,23 @@ func (s *Service) SubmitWeeklySurvey(ctx context.Context, orgID, studentID uuid.
 			next = sv.WeekNumber + 1
 		}
 	}
-	return s.SubmitSurvey(ctx, orgID, studentID, SubmitSurveyParams{
+	sv, err := s.SubmitSurvey(ctx, orgID, studentID, SubmitSurveyParams{
 		WeekNumber:      next,
 		MotivationScore: motivation,
 		ProgressScore:   progress,
 		BiggestObstacle: obstacle,
 		Comment:         comment,
 	})
+	if err != nil {
+		return entity.Survey{}, err
+	}
+	// Award check-in XP at most once per real calendar week (anti-farming — the survey's own
+	// week number just counts up, so it can't be the idempotency key).
+	if s.awarder != nil {
+		y, w := time.Now().ISOWeek()
+		_ = s.awarder.AwardCheckin(ctx, orgID, studentID, y*100+w)
+	}
+	return sv, nil
 }
 
 // RecordAttendance records one lesson's attendance (status: present|absent|late|excused) and
@@ -352,6 +373,10 @@ func (s *Service) RecordAttendance(ctx context.Context, orgID, studentID uuid.UU
 			return entity.AttendanceRecord{}, ErrNotFound
 		}
 		return entity.AttendanceRecord{}, err
+	}
+	// Reward showing up (present/late/excused) once per group+date.
+	if s.awarder != nil && groupID != nil && status != entity.AttendanceAbsent {
+		_ = s.awarder.AwardAttendance(ctx, orgID, studentID, *groupID, date)
 	}
 	return rec, nil
 }

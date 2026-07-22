@@ -1,4 +1,4 @@
-h1:K75gm3SyVxjup7T+fYfoWyGWgz3rPnwqjSSemw+PmKM=
+h1:qVen8ADNHr1QGn/YP1TJYHbsoB2iw4Joxna+5/2gq3A=
 20260621001046_init.sql h1:0PhWfGa5YtpECqejoxFtDc/dcBRoWHrCZGvQsgwgQZs=
 20260621051500_rls.sql h1:nSxaAZOOpNLTyXoGdnHaVviu4TDnNKhAui7tiFTIYQc=
 20260621060000_composite_fks.sql h1:pk2z0agzhnRTMyfBI/4ULqb7tpnHNRIYXye4TvX65kI=
@@ -33,3 +33,4 @@ h1:K75gm3SyVxjup7T+fYfoWyGWgz3rPnwqjSSemw+PmKM=
 20260722100000_salary_group_rules.sql h1:3c/Q1hWbuPZzRtoNKXXTn6mXLRYBLL2eD+S5IRLVkJc=
 20260722140000_student_auth.sql h1:9p96Q/2kol4xKrVS0QE0az4kMUTZkFVuM9QLLTyxTCs=
 20260722150000_homework.sql h1:Y/bMwF4vNLi9upda+g4jEitWFle5FeOwEu7IOXO6S1I=
+20260722160000_gamification.sql h1:sTKMEhPbtfM2scz2c3N164anN6A1FnMmQeKwZPWFfDk=

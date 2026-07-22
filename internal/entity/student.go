@@ -14,7 +14,7 @@ type StudentAccount struct {
 	Name         string
 }
 
-// StudentProfile is the signed-in student's own profile shown in the mini app.
+// StudentProfile is the signed-in student's own profile + gamification shown in the mini app.
 type StudentProfile struct {
 	ID         uuid.UUID
 	OrgID      uuid.UUID
@@ -22,6 +22,8 @@ type StudentProfile struct {
 	Phone      string
 	CourseName string
 	GroupName  string
+	XP         int
+	Coins      int
 }
 
 // Student is an enrolled learner tracked for retention risk.

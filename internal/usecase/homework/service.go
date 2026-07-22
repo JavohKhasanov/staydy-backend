@@ -21,14 +21,25 @@ var (
 	ErrNotFound   = errors.New("homework: not found")
 )
 
+// Awarder grants gamification points as a side-effect of homework actions (satisfied by the points
+// service). Optional — nil means no gamification.
+type Awarder interface {
+	AwardHomeworkSubmit(ctx context.Context, orgID, studentID, assignmentID uuid.UUID, onTime bool) error
+	AwardHomeworkAccept(ctx context.Context, orgID, studentID, submissionID uuid.UUID, score int) error
+}
+
 type Service struct {
-	repo   repo.AssignmentRepository
-	groups repo.GroupRepository
+	repo    repo.AssignmentRepository
+	groups  repo.GroupRepository
+	awarder Awarder
 }
 
 func NewService(r repo.AssignmentRepository, g repo.GroupRepository) *Service {
 	return &Service{repo: r, groups: g}
 }
+
+// SetAwarder wires gamification (call once at startup). Safe to leave unset.
+func (s *Service) SetAwarder(a Awarder) { s.awarder = a }
 
 // canManageGroup lets admins/managers touch any group; a teacher only their own.
 func (s *Service) canManageGroup(ctx context.Context, orgID, groupID uuid.UUID, actor entity.Principal) error {
@@ -115,7 +126,19 @@ func (s *Service) Grade(ctx context.Context, actor entity.Principal, submissionI
 	if status == entity.HomeworkRejected {
 		score = nil
 	}
-	return s.repo.Grade(ctx, actor.OrgID, submissionID, status, score, strings.TrimSpace(note))
+	sub, err := s.repo.Grade(ctx, actor.OrgID, submissionID, status, score, strings.TrimSpace(note))
+	if err != nil {
+		return entity.HomeworkSubmission{}, err
+	}
+	// Award the graded score as XP when accepted (idempotent per submission).
+	if s.awarder != nil && sub.Status == entity.HomeworkAccepted {
+		sc := 0
+		if sub.Score != nil {
+			sc = *sub.Score
+		}
+		_ = s.awarder.AwardHomeworkAccept(ctx, actor.OrgID, sub.StudentID, sub.ID, sc)
+	}
+	return sub, nil
 }
 
 // --- student side ---
@@ -132,11 +155,21 @@ func (s *Service) Submit(ctx context.Context, orgID, studentID, assignmentID uui
 	if text == "" && links == "" {
 		return entity.HomeworkSubmission{}, ErrValidation
 	}
-	if _, err := s.repo.GetAssignmentForStudent(ctx, orgID, assignmentID, studentID); err != nil {
+	assignment, err := s.repo.GetAssignmentForStudent(ctx, orgID, assignmentID, studentID)
+	if err != nil {
 		if errors.Is(err, repo.ErrNotFound) {
 			return entity.HomeworkSubmission{}, ErrForbidden
 		}
 		return entity.HomeworkSubmission{}, err
 	}
-	return s.repo.UpsertSubmission(ctx, orgID, assignmentID, studentID, text, links)
+	sub, err := s.repo.UpsertSubmission(ctx, orgID, assignmentID, studentID, text, links)
+	if err != nil {
+		return entity.HomeworkSubmission{}, err
+	}
+	// Award submit XP once per assignment (on-time = before the deadline, if any).
+	if s.awarder != nil {
+		onTime := assignment.Deadline == nil || !time.Now().After(*assignment.Deadline)
+		_ = s.awarder.AwardHomeworkSubmit(ctx, orgID, studentID, assignmentID, onTime)
+	}
+	return sub, nil
 }

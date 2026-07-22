@@ -362,6 +362,8 @@ type Student struct {
 	Name             string             `json:"name"`
 	Phone            pgtype.Text        `json:"phone"`
 	PasswordHash     string             `json:"password_hash"`
+	Xp               int32              `json:"xp"`
+	Coins            int32              `json:"coins"`
 	TelegramID       pgtype.Text        `json:"telegram_id"`
 	TelegramChatID   pgtype.Int8        `json:"telegram_chat_id"`
 	CourseName       pgtype.Text        `json:"course_name"`
@@ -388,6 +390,17 @@ type Student struct {
 	BranchID         pgtype.UUID        `json:"branch_id"`
 	CreatedAt        pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt        pgtype.Timestamptz `json:"updated_at"`
+}
+
+type StudentPoint struct {
+	ID        uuid.UUID          `json:"id"`
+	OrgID     uuid.UUID          `json:"org_id"`
+	StudentID uuid.UUID          `json:"student_id"`
+	Kind      string             `json:"kind"`
+	Xp        int32              `json:"xp"`
+	Coins     int32              `json:"coins"`
+	Ref       string             `json:"ref"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
 }
 
 type Survey struct {

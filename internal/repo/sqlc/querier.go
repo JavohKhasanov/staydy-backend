@@ -13,6 +13,7 @@ import (
 
 type Querier interface {
 	AddGroupMember(ctx context.Context, arg AddGroupMemberParams) error
+	AddStudentPoints(ctx context.Context, arg AddStudentPointsParams) error
 	AdjustInvoicePaid(ctx context.Context, arg AdjustInvoicePaidParams) error
 	// Sets group_id AND denormalizes group_name to the group's name (or '' when unassigning), so the
 	// legacy group_name field stays in sync — the student list + dashboard read group_name.
@@ -123,7 +124,7 @@ type Querier interface {
 	GetRefreshSessionByHash(ctx context.Context, tokenHash string) (RefreshSession, error)
 	GetSalaryRule(ctx context.Context, teacherID uuid.UUID) (SalaryRule, error)
 	GetStudent(ctx context.Context, id uuid.UUID) (Student, error)
-	// The signed-in student's own profile (RLS-scoped; id comes from the student JWT).
+	// The signed-in student's own profile + gamification (RLS-scoped; id comes from the student JWT).
 	GetStudentForApp(ctx context.Context, id uuid.UUID) (GetStudentForAppRow, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	GetUserByID(ctx context.Context, id uuid.UUID) (User, error)
@@ -138,6 +139,8 @@ type Querier interface {
 	// Powers the "davomat qilinmagan" dashboard/notification alert.
 	GroupsMissingAttendance(ctx context.Context, arg GroupsMissingAttendanceParams) ([]Group, error)
 	HighRiskStudents(ctx context.Context) ([]Student, error)
+	// Idempotent award: no-op (no row returned) when this (kind, ref) already exists for the student.
+	InsertPointsIfNew(ctx context.Context, arg InsertPointsIfNewParams) (uuid.UUID, error)
 	InsertSalaryGroupRule(ctx context.Context, arg InsertSalaryGroupRuleParams) (SalaryGroupRule, error)
 	ListActivePlans(ctx context.Context) ([]Plan, error)
 	ListActivities(ctx context.Context, arg ListActivitiesParams) ([]Activity, error)
@@ -198,6 +201,8 @@ type Querier interface {
 	SetStudentLoginPassword(ctx context.Context, arg SetStudentLoginPasswordParams) error
 	SetStudentTelegramChat(ctx context.Context, arg SetStudentTelegramChatParams) error
 	SlugExists(ctx context.Context, slug string) (bool, error)
+	// Deduct coins only if the balance covers it (returns the row when it succeeded).
+	SpendStudentCoins(ctx context.Context, arg SpendStudentCoinsParams) (int32, error)
 	StartInterventionTask(ctx context.Context, id uuid.UUID) (InterventionTask, error)
 	StudentBalance(ctx context.Context, studentID uuid.UUID) (int64, error)
 	// Per-group basis for a teacher's groups: active members (via group_members), lessons taught, and

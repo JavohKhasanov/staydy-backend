@@ -20,6 +20,8 @@ var (
 	ErrSessionReused = errors.New("repo: refresh token reuse detected")
 	// ErrOverpay means a payment exceeds the invoice's remaining balance.
 	ErrOverpay = errors.New("repo: payment exceeds invoice balance")
+	// ErrInsufficientCoins means a student's coin balance can't cover a purchase.
+	ErrInsufficientCoins = errors.New("repo: insufficient coins")
 )
 
 // ProvisionParams creates an organization plus its first admin atomically.
@@ -136,6 +138,12 @@ type StudentRepository interface {
 // StudentAuthRepository resolves a student login by phone across tenants (RLS-bypassing lookup).
 type StudentAuthRepository interface {
 	LookupByPhone(ctx context.Context, phone string) ([]entity.StudentAccount, error)
+}
+
+// PointsRepository records gamification awards/spends and keeps student XP/coin totals in sync.
+type PointsRepository interface {
+	Award(ctx context.Context, orgID, studentID uuid.UUID, kind string, xp, coins int, ref string) (bool, error)
+	Spend(ctx context.Context, orgID, studentID uuid.UUID, coins int, ref string) error
 }
 
 // CreateAssignmentParams is a new homework assignment (org_id supplied separately, from the JWT).

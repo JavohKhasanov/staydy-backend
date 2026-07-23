@@ -20,6 +20,7 @@ type taskResponse struct {
 	StudentID         string   `json:"studentId"`
 	StudentName       string   `json:"studentName"`
 	Reasons           []string `json:"reasons"`
+	SuggestedActions  []string `json:"suggestedActions"` // playbook: what to do about each reason
 	Status            string   `json:"status"`
 	ResolutionComment string   `json:"resolutionComment,omitempty"`
 	CreatedAt         string   `json:"createdAt"`
@@ -120,6 +121,7 @@ func toTaskResponse(t entity.InterventionTask) taskResponse {
 		StudentID:         t.StudentID.String(),
 		StudentName:       t.StudentName,
 		Reasons:           t.Reasons,
+		SuggestedActions:  interventionusecase.SuggestedActions(t.Reasons),
 		Status:            t.Status,
 		ResolutionComment: t.ResolutionComment,
 		CreatedAt:         t.CreatedAt.UTC().Format(time.RFC3339),

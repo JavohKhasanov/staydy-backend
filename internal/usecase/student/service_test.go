@@ -186,11 +186,12 @@ func TestSubmitSurvey_Validation(t *testing.T) {
 // A low survey on a poorly-attending student → Red, with task reasons.
 func TestOutcome_RedHasReasons(t *testing.T) {
 	svc := newTestSvc(&fakeRepo{})
-	att := []entity.AttendanceRecord{{IsPresent: false}, {IsPresent: false}} // 0% attendance
+	att := []entity.AttendanceRecord{{IsPresent: false}, {IsPresent: false}} // 0% attendance, 2 in a row
 	surv := []entity.Survey{{WeekNumber: 1, MotivationScore: 1, ProgressScore: 1}}
 	out := svc.outcome(entity.Student{ConfidenceLevel: 5}, att, surv, nil)
-	if out.Tier != "Red" || out.Score != 95 { // 40 + 25 + 20 + 10
-		t.Fatalf("got %d/%s, want 95/Red", out.Score, out.Tier)
+	// 40(att) + 25(mot) + 20(prog) + 10(conf) + 15(2 consecutive absences) = 110 → capped at 100.
+	if out.Tier != "Red" || out.Score != 100 {
+		t.Fatalf("got %d/%s, want 100/Red", out.Score, out.Tier)
 	}
 	if len(out.TaskReasons) == 0 {
 		t.Fatal("expected task reasons for a Red student")

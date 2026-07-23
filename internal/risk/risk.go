@@ -27,6 +27,11 @@ type Inputs struct {
 	LatestMotivation *int     // 1..5, nil if no survey yet
 	LatestProgress   *int     // 1..5, nil if no survey yet
 	ConfidenceLevel  int      // 1..10 (from onboarding)
+
+	// Churn-imminence signals (not disengagement averages — these fire when a student is
+	// actively slipping toward leaving the center, so the EWS can act before the rate lags catch up).
+	ConsecutiveAbsences int  // trailing sessions missed in a row (0 = attended most recent)
+	HasOverdueDebt      bool // an unpaid invoice past its due window
 }
 
 // Factor explains one contribution to the total score. Neutral marks a "missing data"
@@ -65,6 +70,20 @@ func Evaluate(in Inputs) Result {
 		add("Davomat o'rtacha (<80%)", 20)
 	case in.AttendanceRate < 90:
 		add("Davomat biroz past (<90%)", 10)
+	}
+
+	// 1c. Consecutive absences — the strongest "about to leave" signal. Unlike the attendance
+	// rate (a lagging average), a trailing streak spikes immediately when a student stops coming.
+	switch {
+	case in.ConsecutiveAbsences >= 3:
+		add("Ketma-ket 3+ dars kelmadi (ketish xavfi)", 30)
+	case in.ConsecutiveAbsences == 2:
+		add("Ketma-ket 2 dars kelmadi", 15)
+	}
+
+	// 1d. Overdue payment — debt strongly correlates with dropping out (checked out or can't pay).
+	if in.HasOverdueDebt {
+		add("To'lov qarzi bor", 12)
 	}
 
 	// 1b. Homework completion (max 20); nil → nothing assigned yet, neutral (no points).

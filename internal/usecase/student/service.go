@@ -526,10 +526,11 @@ func evaluateWithTriggers(st entity.Student, att []entity.AttendanceRecord, surv
 	result := computeRisk(st, att, surveys, homework)
 	var triggers []string
 
+	// A long trailing-absence run hard-forces Red regardless of the numeric score. The streak
+	// already contributes graduated points inside computeRisk (and a labelled factor), so this
+	// only needs to guarantee the tier — no duplicate factor/reason.
 	if consecutiveTrailingAbsences(att) >= triggerConsecutiveAbsences {
 		result.Tier = risk.TierRed
-		result.Factors = append(result.Factors, risk.Factor{Label: "Ketma-ket darslar qoldirildi", Points: 0})
-		triggers = append(triggers, "Ketma-ket darslar qoldirildi")
 	}
 	// st.RiskScore is the previously persisted score (pre-recompute). Only flag a genuine jump
 	// into risk territory, not a brand-new student's first non-zero score.
@@ -554,11 +555,13 @@ func consecutiveTrailingAbsences(att []entity.AttendanceRecord) int {
 // computeRisk derives the risk Result from confidence + attendance + homework + latest survey.
 func computeRisk(st entity.Student, att []entity.AttendanceRecord, surveys []entity.Survey, homework []entity.HomeworkRecord) risk.Result {
 	return risk.Evaluate(risk.Inputs{
-		AttendanceRate:   completionRate(len(att), countPresent(att)),
-		HomeworkRate:     homeworkRate(homework),
-		LatestMotivation: latestMotivation(surveys),
-		LatestProgress:   latestProgress(surveys),
-		ConfidenceLevel:  st.ConfidenceLevel,
+		AttendanceRate:      completionRate(len(att), countPresent(att)),
+		HomeworkRate:        homeworkRate(homework),
+		LatestMotivation:    latestMotivation(surveys),
+		LatestProgress:      latestProgress(surveys),
+		ConfidenceLevel:     st.ConfidenceLevel,
+		ConsecutiveAbsences: consecutiveTrailingAbsences(att),
+		// HasOverdueDebt is wired in the finance-signal step (recompute needs per-student invoices).
 	})
 }
 

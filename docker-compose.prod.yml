@@ -88,7 +88,7 @@ services:
       - "172.17.0.1:3012:3000"
     restart: unless-stopped
 
-  # Student mini app (Telegram + web). Point the proxy host talaba.staydy.uz → 172.17.0.1:3013.
+  # Student mini app (Telegram + web). Point the proxy host student.staydy.uz → 172.17.0.1:3013.
   student:
     build:
       context: ../staydy-student

@@ -50,6 +50,9 @@ services:
       # The app connects as the non-superuser "app" role so Postgres RLS is enforced (FORCE RLS).
       # Postgres isn't public, so the internal app:app credential is fine; rotate it if you wish.
       DATABASE_URL: postgres://app:app@postgres:5432/ssp?sslmode=disable
+      # Browser origins allowed to call the API. Set here (overrides .env) so every real
+      # frontend subdomain is version-controlled — add a new surface's domain when you ship it.
+      CORS_ORIGINS: https://staydy.uz,https://www.staydy.uz,https://app.staydy.uz,https://admin.staydy.uz,https://student.staydy.uz
     ports:
       # Bound to the docker0 gateway so Nginx Proxy Manager (a container) reaches it via 172.17.0.1;
       # not publicly exposed. Host port avoids the existing 808x/3000 services on this box.

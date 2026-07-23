@@ -352,6 +352,12 @@ WHERE s.assignment_id = $1::uuid ORDER BY s.submitted_at DESC;
 UPDATE homework_submissions SET status = $2, score = $3, review_note = $4, reviewed_at = now(), updated_at = now()
 WHERE id = $1 RETURNING *;
 
+-- name: GetSubmissionGroup :one
+-- The group a submission belongs to (via its assignment), for teacher ownership checks on grading.
+SELECT a.group_id FROM homework_submissions s
+JOIN homework_assignments a ON a.id = s.assignment_id
+WHERE s.id = $1;
+
 -- name: GetAssignmentForStudent :one
 -- The assignment, only if the student is a member of its group (visibility + submit guard).
 SELECT a.* FROM homework_assignments a
@@ -394,7 +400,8 @@ ON CONFLICT (org_id, student_id, kind, ref) DO NOTHING
 RETURNING id;
 
 -- name: AddStudentPoints :exec
-UPDATE students SET xp = xp + $2, coins = coins + $3, updated_at = now() WHERE id = $1;
+-- xp/coins may be negative (manual penalty); floor both at 0 so totals never go negative.
+UPDATE students SET xp = GREATEST(0, xp + $2), coins = GREATEST(0, coins + $3), updated_at = now() WHERE id = $1;
 
 -- name: SpendStudentCoins :one
 -- Deduct coins only if the balance covers it (returns the row when it succeeded).

@@ -3,6 +3,7 @@ package http
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
 	"time"
@@ -11,6 +12,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/student-success/backend/internal/entity"
+	groupusecase "github.com/student-success/backend/internal/usecase/group"
 	pointsusecase "github.com/student-success/backend/internal/usecase/points"
 )
 
@@ -81,9 +83,13 @@ func registerGamification(api huma.API, svc *pointsusecase.Service, log zerolog.
 	})
 }
 
+// maxManualXP bounds a single manual/exam award (positive or negative) so a teacher can't mint a
+// student straight to max level (or nuke them) in one call. Larger awards are split across calls.
+const maxManualXP = 100
+
 // registerManualXP mounts the teacher/admin one-off XP award (exam pass, manual bonus). Mount on the
-// teaching group.
-func registerManualXP(api huma.API, svc *pointsusecase.Service, log zerolog.Logger) {
+// teaching group. A teacher may only award to students in their own groups; managers/directors, any.
+func registerManualXP(api huma.API, svc *pointsusecase.Service, groups *groupusecase.Service, log zerolog.Logger) {
 	Register(api, BearerOperation(huma.Operation{
 		OperationID:   "student-award-xp",
 		Method:        http.MethodPost,
@@ -96,6 +102,19 @@ func registerManualXP(api huma.API, svc *pointsusecase.Service, log zerolog.Logg
 		p, id, err := orgAndID(ctx, in.ID)
 		if err != nil {
 			return nil, err
+		}
+		if in.Body.XP < -maxManualXP || in.Body.XP > maxManualXP {
+			return nil, huma.Error422UnprocessableEntity(fmt.Sprintf("XP %d..%d oralig'ida bo'lishi kerak", -maxManualXP, maxManualXP))
+		}
+		// Teachers may only award to their own students; managers/directors are unrestricted.
+		if p.Role == entity.RoleTeacher {
+			owns, oerr := groups.OwnsStudent(ctx, p.OrgID, p.UserID, id)
+			if oerr != nil {
+				return nil, mapGroupError(LangFromContext(ctx), oerr, log)
+			}
+			if !owns {
+				return nil, huma.Error403Forbidden("student is not in your group")
+			}
 		}
 		kind := entity.PointManual
 		if in.Body.Kind == entity.PointExam {

@@ -13,6 +13,7 @@ import (
 
 type Querier interface {
 	AddGroupMember(ctx context.Context, arg AddGroupMemberParams) error
+	// xp/coins may be negative (manual penalty); floor both at 0 so totals never go negative.
 	AddStudentPoints(ctx context.Context, arg AddStudentPointsParams) error
 	AdjustInvoicePaid(ctx context.Context, arg AdjustInvoicePaidParams) error
 	// Sets group_id AND denormalizes group_name to the group's name (or '' when unassigning), so the
@@ -131,6 +132,8 @@ type Querier interface {
 	GetStudent(ctx context.Context, id uuid.UUID) (Student, error)
 	// The signed-in student's own profile + gamification (RLS-scoped; id comes from the student JWT).
 	GetStudentForApp(ctx context.Context, id uuid.UUID) (GetStudentForAppRow, error)
+	// The group a submission belongs to (via its assignment), for teacher ownership checks on grading.
+	GetSubmissionGroup(ctx context.Context, id uuid.UUID) (uuid.UUID, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	GetUserByID(ctx context.Context, id uuid.UUID) (User, error)
 	// Group members who attended sessions this period but have NO invoice for that group yet

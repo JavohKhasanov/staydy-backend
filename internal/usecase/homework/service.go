@@ -125,6 +125,17 @@ func (s *Service) Grade(ctx context.Context, actor entity.Principal, submissionI
 	if status == entity.HomeworkRejected {
 		score = nil
 	}
+	// A teacher may only grade submissions in groups they own (RLS scopes org, not group).
+	gid, err := s.repo.GroupForSubmission(ctx, actor.OrgID, submissionID)
+	if err != nil {
+		if errors.Is(err, repo.ErrNotFound) {
+			return entity.HomeworkSubmission{}, ErrNotFound
+		}
+		return entity.HomeworkSubmission{}, err
+	}
+	if err := s.canManageGroup(ctx, actor.OrgID, gid, actor); err != nil {
+		return entity.HomeworkSubmission{}, err
+	}
 	sub, err := s.repo.Grade(ctx, actor.OrgID, submissionID, status, score, strings.TrimSpace(note))
 	if err != nil {
 		return entity.HomeworkSubmission{}, err

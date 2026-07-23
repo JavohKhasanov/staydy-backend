@@ -148,6 +148,24 @@ func (r *AssignmentRepository) Grade(ctx context.Context, orgID, submissionID uu
 	return s, err
 }
 
+// GroupForSubmission returns the group id a submission belongs to (via its assignment), so the
+// usecase can verify a grading teacher actually owns that group.
+func (r *AssignmentRepository) GroupForSubmission(ctx context.Context, orgID, submissionID uuid.UUID) (uuid.UUID, error) {
+	var gid uuid.UUID
+	err := r.db.WithTenant(ctx, orgID.String(), func(tx pgx.Tx) error {
+		g, e := sqlc.New(tx).GetSubmissionGroup(ctx, submissionID)
+		if e != nil {
+			return e
+		}
+		gid = g
+		return nil
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return uuid.Nil, repo.ErrNotFound
+	}
+	return gid, err
+}
+
 // GetAssignmentForStudent returns the assignment only if the student is a member of its group.
 func (r *AssignmentRepository) GetAssignmentForStudent(ctx context.Context, orgID, assignmentID, studentID uuid.UUID) (entity.HomeworkAssignment, error) {
 	var a entity.HomeworkAssignment

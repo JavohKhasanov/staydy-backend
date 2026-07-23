@@ -204,6 +204,10 @@ func (s *Service) Refresh(ctx context.Context, refreshToken string, dev DeviceMe
 	if err != nil {
 		return nil, fmt.Errorf("auth: org lookup: %w", err)
 	}
+	// A suspended/archived center must not keep access alive by rotating refresh tokens.
+	if !org.IsActive() {
+		return nil, ErrSuspended
+	}
 
 	principal := entity.Principal{
 		UserID:   user.ID,

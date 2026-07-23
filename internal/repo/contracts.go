@@ -180,6 +180,7 @@ type AssignmentRepository interface {
 	DeleteAssignment(ctx context.Context, orgID, id uuid.UUID) error
 	ListSubmissions(ctx context.Context, orgID, assignmentID uuid.UUID) ([]entity.HomeworkSubmission, error)
 	Grade(ctx context.Context, orgID, submissionID uuid.UUID, status string, score *int, note string) (entity.HomeworkSubmission, error)
+	GroupForSubmission(ctx context.Context, orgID, submissionID uuid.UUID) (uuid.UUID, error)
 	GetAssignmentForStudent(ctx context.Context, orgID, assignmentID, studentID uuid.UUID) (entity.HomeworkAssignment, error)
 	UpsertSubmission(ctx context.Context, orgID, assignmentID, studentID uuid.UUID, text, links string) (entity.HomeworkSubmission, error)
 	ListStudentAssignments(ctx context.Context, orgID, studentID uuid.UUID) ([]entity.StudentAssignment, error)

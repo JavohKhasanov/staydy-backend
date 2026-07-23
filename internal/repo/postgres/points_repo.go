@@ -25,7 +25,8 @@ func NewPointsRepository(db *postgres.DB) *PointsRepository { return &PointsRepo
 // increments their totals — but only the first time for a given (kind, ref). The student row is
 // locked so concurrent awards price coins consistently. Returns whether a new award was applied.
 func (r *PointsRepository) Award(ctx context.Context, orgID, studentID uuid.UUID, kind string, xp int, ref string, cfg entity.GamificationConfig) (bool, error) {
-	if xp <= 0 {
+	// xp == 0 is a no-op; negative xp is a valid manual penalty (deducts, floored at 0 in the UPDATE).
+	if xp == 0 {
 		return false, nil
 	}
 	awarded := false

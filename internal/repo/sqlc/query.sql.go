@@ -29,7 +29,7 @@ func (q *Queries) AddGroupMember(ctx context.Context, arg AddGroupMemberParams) 
 }
 
 const addStudentPoints = `-- name: AddStudentPoints :exec
-UPDATE students SET xp = xp + $2, coins = coins + $3, updated_at = now() WHERE id = $1
+UPDATE students SET xp = GREATEST(0, xp + $2), coins = GREATEST(0, coins + $3), updated_at = now() WHERE id = $1
 `
 
 type AddStudentPointsParams struct {
@@ -38,6 +38,7 @@ type AddStudentPointsParams struct {
 	Coins int32     `json:"coins"`
 }
 
+// xp/coins may be negative (manual penalty); floor both at 0 so totals never go negative.
 func (q *Queries) AddStudentPoints(ctx context.Context, arg AddStudentPointsParams) error {
 	_, err := q.db.Exec(ctx, addStudentPoints, arg.ID, arg.Xp, arg.Coins)
 	return err
@@ -2412,6 +2413,20 @@ func (q *Queries) GetStudentForApp(ctx context.Context, id uuid.UUID) (GetStuden
 		&i.GroupName,
 	)
 	return i, err
+}
+
+const getSubmissionGroup = `-- name: GetSubmissionGroup :one
+SELECT a.group_id FROM homework_submissions s
+JOIN homework_assignments a ON a.id = s.assignment_id
+WHERE s.id = $1
+`
+
+// The group a submission belongs to (via its assignment), for teacher ownership checks on grading.
+func (q *Queries) GetSubmissionGroup(ctx context.Context, id uuid.UUID) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, getSubmissionGroup, id)
+	var group_id uuid.UUID
+	err := row.Scan(&group_id)
+	return group_id, err
 }
 
 const getUserByEmail = `-- name: GetUserByEmail :one

@@ -53,7 +53,7 @@ type gradeInput struct {
 	ID   string `path:"id" format:"uuid"` // submission id
 	Body struct {
 		Status string `json:"status" enum:"accepted,rejected"`
-		Score  *int   `json:"score,omitempty" minimum:"0"`
+		XP     *int   `json:"xp,omitempty" minimum:"0" doc:"homework XP grade (0..center max) — awarded on accept"`
 		Note   string `json:"note,omitempty" maxLength:"1000"`
 	}
 }
@@ -170,7 +170,7 @@ func registerHomework(api huma.API, svc *homeworkusecase.Service, log zerolog.Lo
 		if err != nil {
 			return nil, err
 		}
-		s, err := svc.Grade(ctx, p, id, in.Body.Status, in.Body.Score, in.Body.Note)
+		s, err := svc.Grade(ctx, p, id, in.Body.Status, in.Body.XP, in.Body.Note)
 		if err != nil {
 			return nil, mapHomeworkError(err, log)
 		}

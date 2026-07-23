@@ -107,7 +107,7 @@ type Detail struct {
 // Awarder grants gamification points for attended lessons and completed check-ins (satisfied by the
 // points service). Optional — nil means no gamification.
 type Awarder interface {
-	AwardAttendance(ctx context.Context, orgID, studentID, groupID uuid.UUID, date time.Time) error
+	AwardAttendance(ctx context.Context, orgID, studentID, groupID uuid.UUID, date time.Time, status string) error
 	AwardCheckin(ctx context.Context, orgID, studentID uuid.UUID, week int) error
 }
 
@@ -374,9 +374,9 @@ func (s *Service) RecordAttendance(ctx context.Context, orgID, studentID uuid.UU
 		}
 		return entity.AttendanceRecord{}, err
 	}
-	// Reward showing up (present/late/excused) once per group+date.
-	if s.awarder != nil && groupID != nil && status != entity.AttendanceAbsent {
-		_ = s.awarder.AwardAttendance(ctx, orgID, studentID, *groupID, date)
+	// Reward attendance (the awarder scales XP by status: on-time > late; absent earns nothing).
+	if s.awarder != nil && groupID != nil {
+		_ = s.awarder.AwardAttendance(ctx, orgID, studentID, *groupID, date, status)
 	}
 	return rec, nil
 }

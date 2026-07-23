@@ -39,6 +39,16 @@ SELECT grace_lessons FROM organizations WHERE id = $1;
 -- name: SetGraceLessons :exec
 UPDATE organizations SET grace_lessons = $2, updated_at = now() WHERE id = $1;
 
+-- name: GetGamification :one
+SELECT gx_xp_attend, gx_xp_late, gx_xp_homework_max, gx_xp_checkin, gx_level_size, gx_coin_base, gx_coin_step
+FROM organizations WHERE id = $1;
+
+-- name: SetGamification :exec
+UPDATE organizations SET
+  gx_xp_attend = $2, gx_xp_late = $3, gx_xp_homework_max = $4, gx_xp_checkin = $5,
+  gx_level_size = $6, gx_coin_base = $7, gx_coin_step = $8, updated_at = now()
+WHERE id = $1;
+
 -- name: DeleteOrganization :exec
 DELETE FROM organizations WHERE id = $1;
 

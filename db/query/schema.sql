@@ -15,6 +15,14 @@ CREATE TABLE organizations (
     trial_ends_at  timestamptz DEFAULT (now() + interval '30 days'), -- free month; Payme/Click gateway is post-MVP
     billing_status text NOT NULL DEFAULT 'trial', -- 'trial' | 'active' (paid) | 'expired'
     grace_lessons  int NOT NULL DEFAULT 3, -- attended sessions allowed before missing-invoice flag
+    -- Gamification config (tunable per center). coins = xp * (coin_base + (level-1)*coin_step).
+    gx_xp_attend       int NOT NULL DEFAULT 2,
+    gx_xp_late         int NOT NULL DEFAULT 1,
+    gx_xp_homework_max int NOT NULL DEFAULT 5,
+    gx_xp_checkin      int NOT NULL DEFAULT 2,
+    gx_level_size      int NOT NULL DEFAULT 300,
+    gx_coin_base       int NOT NULL DEFAULT 4,
+    gx_coin_step       int NOT NULL DEFAULT 1,
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now()
 );

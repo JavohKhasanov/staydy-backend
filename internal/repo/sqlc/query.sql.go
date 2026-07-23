@@ -964,7 +964,7 @@ const createOrganization = `-- name: CreateOrganization :one
 
 INSERT INTO organizations (name, slug, plan)
 VALUES ($1, $2, $3)
-RETURNING id, name, slug, plan, status, trial_ends_at, billing_status, grace_lessons, created_at, updated_at
+RETURNING id, name, slug, plan, status, trial_ends_at, billing_status, grace_lessons, gx_xp_attend, gx_xp_late, gx_xp_homework_max, gx_xp_checkin, gx_level_size, gx_coin_base, gx_coin_step, created_at, updated_at
 `
 
 type CreateOrganizationParams struct {
@@ -990,6 +990,13 @@ func (q *Queries) CreateOrganization(ctx context.Context, arg CreateOrganization
 		&i.TrialEndsAt,
 		&i.BillingStatus,
 		&i.GraceLessons,
+		&i.GxXpAttend,
+		&i.GxXpLate,
+		&i.GxXpHomeworkMax,
+		&i.GxXpCheckin,
+		&i.GxLevelSize,
+		&i.GxCoinBase,
+		&i.GxCoinStep,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -1986,6 +1993,36 @@ func (q *Queries) GetCourse(ctx context.Context, arg GetCourseParams) (Course, e
 	return i, err
 }
 
+const getGamification = `-- name: GetGamification :one
+SELECT gx_xp_attend, gx_xp_late, gx_xp_homework_max, gx_xp_checkin, gx_level_size, gx_coin_base, gx_coin_step
+FROM organizations WHERE id = $1
+`
+
+type GetGamificationRow struct {
+	GxXpAttend      int32 `json:"gx_xp_attend"`
+	GxXpLate        int32 `json:"gx_xp_late"`
+	GxXpHomeworkMax int32 `json:"gx_xp_homework_max"`
+	GxXpCheckin     int32 `json:"gx_xp_checkin"`
+	GxLevelSize     int32 `json:"gx_level_size"`
+	GxCoinBase      int32 `json:"gx_coin_base"`
+	GxCoinStep      int32 `json:"gx_coin_step"`
+}
+
+func (q *Queries) GetGamification(ctx context.Context, id uuid.UUID) (GetGamificationRow, error) {
+	row := q.db.QueryRow(ctx, getGamification, id)
+	var i GetGamificationRow
+	err := row.Scan(
+		&i.GxXpAttend,
+		&i.GxXpLate,
+		&i.GxXpHomeworkMax,
+		&i.GxXpCheckin,
+		&i.GxLevelSize,
+		&i.GxCoinBase,
+		&i.GxCoinStep,
+	)
+	return i, err
+}
+
 const getGraceLessons = `-- name: GetGraceLessons :one
 SELECT grace_lessons FROM organizations WHERE id = $1
 `
@@ -2155,7 +2192,7 @@ func (q *Queries) GetLessonByGroupDate(ctx context.Context, arg GetLessonByGroup
 }
 
 const getOrganizationByID = `-- name: GetOrganizationByID :one
-SELECT id, name, slug, plan, status, trial_ends_at, billing_status, grace_lessons, created_at, updated_at FROM organizations WHERE id = $1
+SELECT id, name, slug, plan, status, trial_ends_at, billing_status, grace_lessons, gx_xp_attend, gx_xp_late, gx_xp_homework_max, gx_xp_checkin, gx_level_size, gx_coin_base, gx_coin_step, created_at, updated_at FROM organizations WHERE id = $1
 `
 
 func (q *Queries) GetOrganizationByID(ctx context.Context, id uuid.UUID) (Organization, error) {
@@ -2170,6 +2207,13 @@ func (q *Queries) GetOrganizationByID(ctx context.Context, id uuid.UUID) (Organi
 		&i.TrialEndsAt,
 		&i.BillingStatus,
 		&i.GraceLessons,
+		&i.GxXpAttend,
+		&i.GxXpLate,
+		&i.GxXpHomeworkMax,
+		&i.GxXpCheckin,
+		&i.GxLevelSize,
+		&i.GxCoinBase,
+		&i.GxCoinStep,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -2177,7 +2221,7 @@ func (q *Queries) GetOrganizationByID(ctx context.Context, id uuid.UUID) (Organi
 }
 
 const getOrganizationBySlug = `-- name: GetOrganizationBySlug :one
-SELECT id, name, slug, plan, status, trial_ends_at, billing_status, grace_lessons, created_at, updated_at FROM organizations WHERE slug = $1
+SELECT id, name, slug, plan, status, trial_ends_at, billing_status, grace_lessons, gx_xp_attend, gx_xp_late, gx_xp_homework_max, gx_xp_checkin, gx_level_size, gx_coin_base, gx_coin_step, created_at, updated_at FROM organizations WHERE slug = $1
 `
 
 func (q *Queries) GetOrganizationBySlug(ctx context.Context, slug string) (Organization, error) {
@@ -2192,6 +2236,13 @@ func (q *Queries) GetOrganizationBySlug(ctx context.Context, slug string) (Organ
 		&i.TrialEndsAt,
 		&i.BillingStatus,
 		&i.GraceLessons,
+		&i.GxXpAttend,
+		&i.GxXpLate,
+		&i.GxXpHomeworkMax,
+		&i.GxXpCheckin,
+		&i.GxLevelSize,
+		&i.GxCoinBase,
+		&i.GxCoinStep,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -2956,7 +3007,7 @@ func (q *Queries) ListAllOrgIDs(ctx context.Context) ([]uuid.UUID, error) {
 }
 
 const listAllOrganizations = `-- name: ListAllOrganizations :many
-SELECT id, name, slug, plan, status, trial_ends_at, billing_status, grace_lessons, created_at, updated_at FROM organizations ORDER BY created_at DESC
+SELECT id, name, slug, plan, status, trial_ends_at, billing_status, grace_lessons, gx_xp_attend, gx_xp_late, gx_xp_homework_max, gx_xp_checkin, gx_level_size, gx_coin_base, gx_coin_step, created_at, updated_at FROM organizations ORDER BY created_at DESC
 `
 
 // NON-RLS: superadmin center list (full rows; the caller filters out the platform org).
@@ -2978,6 +3029,13 @@ func (q *Queries) ListAllOrganizations(ctx context.Context) ([]Organization, err
 			&i.TrialEndsAt,
 			&i.BillingStatus,
 			&i.GraceLessons,
+			&i.GxXpAttend,
+			&i.GxXpLate,
+			&i.GxXpHomeworkMax,
+			&i.GxXpCheckin,
+			&i.GxLevelSize,
+			&i.GxCoinBase,
+			&i.GxCoinStep,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 		); err != nil {
@@ -4687,6 +4745,38 @@ func (q *Queries) SetBotConversationFlow(ctx context.Context, arg SetBotConversa
 	return err
 }
 
+const setGamification = `-- name: SetGamification :exec
+UPDATE organizations SET
+  gx_xp_attend = $2, gx_xp_late = $3, gx_xp_homework_max = $4, gx_xp_checkin = $5,
+  gx_level_size = $6, gx_coin_base = $7, gx_coin_step = $8, updated_at = now()
+WHERE id = $1
+`
+
+type SetGamificationParams struct {
+	ID              uuid.UUID `json:"id"`
+	GxXpAttend      int32     `json:"gx_xp_attend"`
+	GxXpLate        int32     `json:"gx_xp_late"`
+	GxXpHomeworkMax int32     `json:"gx_xp_homework_max"`
+	GxXpCheckin     int32     `json:"gx_xp_checkin"`
+	GxLevelSize     int32     `json:"gx_level_size"`
+	GxCoinBase      int32     `json:"gx_coin_base"`
+	GxCoinStep      int32     `json:"gx_coin_step"`
+}
+
+func (q *Queries) SetGamification(ctx context.Context, arg SetGamificationParams) error {
+	_, err := q.db.Exec(ctx, setGamification,
+		arg.ID,
+		arg.GxXpAttend,
+		arg.GxXpLate,
+		arg.GxXpHomeworkMax,
+		arg.GxXpCheckin,
+		arg.GxLevelSize,
+		arg.GxCoinBase,
+		arg.GxCoinStep,
+	)
+	return err
+}
+
 const setGraceLessons = `-- name: SetGraceLessons :exec
 UPDATE organizations SET grace_lessons = $2, updated_at = now() WHERE id = $1
 `
@@ -5251,7 +5341,7 @@ func (q *Queries) UpdateOpenTaskReasons(ctx context.Context, arg UpdateOpenTaskR
 
 const updateOrgBilling = `-- name: UpdateOrgBilling :one
 UPDATE organizations SET plan = $2, billing_status = $3, trial_ends_at = $4, updated_at = now()
-WHERE id = $1 RETURNING id, name, slug, plan, status, trial_ends_at, billing_status, grace_lessons, created_at, updated_at
+WHERE id = $1 RETURNING id, name, slug, plan, status, trial_ends_at, billing_status, grace_lessons, gx_xp_attend, gx_xp_late, gx_xp_homework_max, gx_xp_checkin, gx_level_size, gx_coin_base, gx_coin_step, created_at, updated_at
 `
 
 type UpdateOrgBillingParams struct {
@@ -5278,6 +5368,13 @@ func (q *Queries) UpdateOrgBilling(ctx context.Context, arg UpdateOrgBillingPara
 		&i.TrialEndsAt,
 		&i.BillingStatus,
 		&i.GraceLessons,
+		&i.GxXpAttend,
+		&i.GxXpLate,
+		&i.GxXpHomeworkMax,
+		&i.GxXpCheckin,
+		&i.GxLevelSize,
+		&i.GxCoinBase,
+		&i.GxCoinStep,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -5285,7 +5382,7 @@ func (q *Queries) UpdateOrgBilling(ctx context.Context, arg UpdateOrgBillingPara
 }
 
 const updateOrgPlanStatus = `-- name: UpdateOrgPlanStatus :one
-UPDATE organizations SET plan = $2, status = $3, updated_at = now() WHERE id = $1 RETURNING id, name, slug, plan, status, trial_ends_at, billing_status, grace_lessons, created_at, updated_at
+UPDATE organizations SET plan = $2, status = $3, updated_at = now() WHERE id = $1 RETURNING id, name, slug, plan, status, trial_ends_at, billing_status, grace_lessons, gx_xp_attend, gx_xp_late, gx_xp_homework_max, gx_xp_checkin, gx_level_size, gx_coin_base, gx_coin_step, created_at, updated_at
 `
 
 type UpdateOrgPlanStatusParams struct {
@@ -5306,6 +5403,13 @@ func (q *Queries) UpdateOrgPlanStatus(ctx context.Context, arg UpdateOrgPlanStat
 		&i.TrialEndsAt,
 		&i.BillingStatus,
 		&i.GraceLessons,
+		&i.GxXpAttend,
+		&i.GxXpLate,
+		&i.GxXpHomeworkMax,
+		&i.GxXpCheckin,
+		&i.GxLevelSize,
+		&i.GxCoinBase,
+		&i.GxCoinStep,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)

@@ -21,11 +21,10 @@ var (
 	ErrNotFound   = errors.New("homework: not found")
 )
 
-// Awarder grants gamification points as a side-effect of homework actions (satisfied by the points
-// service). Optional — nil means no gamification.
+// Awarder grants the teacher's graded homework XP (satisfied by the points service). Optional — nil
+// means no gamification.
 type Awarder interface {
-	AwardHomeworkSubmit(ctx context.Context, orgID, studentID, assignmentID uuid.UUID, onTime bool) error
-	AwardHomeworkAccept(ctx context.Context, orgID, studentID, submissionID uuid.UUID, score int) error
+	AwardHomework(ctx context.Context, orgID, studentID, submissionID uuid.UUID, xp int) error
 }
 
 type Service struct {
@@ -122,7 +121,7 @@ func (s *Service) Grade(ctx context.Context, actor entity.Principal, submissionI
 	if score != nil && *score < 0 {
 		return entity.HomeworkSubmission{}, ErrValidation
 	}
-	// A rejected submission carries no score.
+	// A rejected submission carries no XP grade.
 	if status == entity.HomeworkRejected {
 		score = nil
 	}
@@ -130,13 +129,13 @@ func (s *Service) Grade(ctx context.Context, actor entity.Principal, submissionI
 	if err != nil {
 		return entity.HomeworkSubmission{}, err
 	}
-	// Award the graded score as XP when accepted (idempotent per submission).
+	// The grade value IS the homework XP (0..max); award it once per submission when accepted.
 	if s.awarder != nil && sub.Status == entity.HomeworkAccepted {
-		sc := 0
+		xp := 0
 		if sub.Score != nil {
-			sc = *sub.Score
+			xp = *sub.Score
 		}
-		_ = s.awarder.AwardHomeworkAccept(ctx, actor.OrgID, sub.StudentID, sub.ID, sc)
+		_ = s.awarder.AwardHomework(ctx, actor.OrgID, sub.StudentID, sub.ID, xp)
 	}
 	return sub, nil
 }
@@ -155,21 +154,13 @@ func (s *Service) Submit(ctx context.Context, orgID, studentID, assignmentID uui
 	if text == "" && links == "" {
 		return entity.HomeworkSubmission{}, ErrValidation
 	}
-	assignment, err := s.repo.GetAssignmentForStudent(ctx, orgID, assignmentID, studentID)
-	if err != nil {
+	// Guard: the student must be a member of the assignment's group. Submitting itself earns no XP
+	// (only the teacher's grade does).
+	if _, err := s.repo.GetAssignmentForStudent(ctx, orgID, assignmentID, studentID); err != nil {
 		if errors.Is(err, repo.ErrNotFound) {
 			return entity.HomeworkSubmission{}, ErrForbidden
 		}
 		return entity.HomeworkSubmission{}, err
 	}
-	sub, err := s.repo.UpsertSubmission(ctx, orgID, assignmentID, studentID, text, links)
-	if err != nil {
-		return entity.HomeworkSubmission{}, err
-	}
-	// Award submit XP once per assignment (on-time = before the deadline, if any).
-	if s.awarder != nil {
-		onTime := assignment.Deadline == nil || !time.Now().After(*assignment.Deadline)
-		_ = s.awarder.AwardHomeworkSubmit(ctx, orgID, studentID, assignmentID, onTime)
-	}
-	return sub, nil
+	return s.repo.UpsertSubmission(ctx, orgID, assignmentID, studentID, text, links)
 }

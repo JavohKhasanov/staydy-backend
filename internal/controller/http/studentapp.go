@@ -9,7 +9,7 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/rs/zerolog"
 
-	"github.com/student-success/backend/internal/entity"
+	pointsusecase "github.com/student-success/backend/internal/usecase/points"
 	studentusecase "github.com/student-success/backend/internal/usecase/student"
 	studentauthusecase "github.com/student-success/backend/internal/usecase/studentauth"
 )
@@ -86,7 +86,7 @@ type studentCheckinInput struct {
 
 // registerStudentApp mounts the signed-in student's own endpoints. Mount on a group gated to the
 // student role.
-func registerStudentApp(api huma.API, svc *studentusecase.Service, log zerolog.Logger) {
+func registerStudentApp(api huma.API, svc *studentusecase.Service, points *pointsusecase.Service, log zerolog.Logger) {
 	Register(api, BearerOperation(huma.Operation{
 		OperationID:   "student-checkin",
 		Method:        http.MethodPost,
@@ -130,11 +130,12 @@ func registerStudentApp(api huma.API, svc *studentusecase.Service, log zerolog.L
 		out.Body.Phone = prof.Phone
 		out.Body.CourseName = prof.CourseName
 		out.Body.GroupName = prof.GroupName
+		cfg := points.Config(ctx, p.OrgID)
 		out.Body.XP = prof.XP
 		out.Body.Coins = prof.Coins
-		out.Body.Level = entity.Level(prof.XP)
-		out.Body.XPIntoLevel = entity.XPIntoLevel(prof.XP)
-		out.Body.XPPerLevel = entity.XPPerLevel
+		out.Body.Level = cfg.LevelForXP(prof.XP)
+		out.Body.XPIntoLevel = cfg.XPIntoLevel(prof.XP)
+		out.Body.XPPerLevel = cfg.LevelSize
 		return out, nil
 	})
 }

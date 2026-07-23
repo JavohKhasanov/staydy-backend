@@ -1,4 +1,4 @@
-h1:pMvUwq/qEbb9PH6HWAWB+Y7Oh10IVm00lzQFrkRgPWc=
+h1:9xUQjgZZjNmvB4vFCI0drEfqBSqlCqbP3g1grM4lmk8=
 20260621001046_init.sql h1:0PhWfGa5YtpECqejoxFtDc/dcBRoWHrCZGvQsgwgQZs=
 20260621051500_rls.sql h1:nSxaAZOOpNLTyXoGdnHaVviu4TDnNKhAui7tiFTIYQc=
 20260621060000_composite_fks.sql h1:pk2z0agzhnRTMyfBI/4ULqb7tpnHNRIYXye4TvX65kI=
@@ -35,3 +35,4 @@ h1:pMvUwq/qEbb9PH6HWAWB+Y7Oh10IVm00lzQFrkRgPWc=
 20260722150000_homework.sql h1:Y/bMwF4vNLi9upda+g4jEitWFle5FeOwEu7IOXO6S1I=
 20260722160000_gamification.sql h1:sTKMEhPbtfM2scz2c3N164anN6A1FnMmQeKwZPWFfDk=
 20260723100000_shop.sql h1:Em5j8HeWrwTNLqE+KwzlBnAU5tmJjd9lwWiE+wYLRc4=
+20260723110000_gamification_config.sql h1:FznaTmR+BxHoUckn+Iux+6cNrEmB4gI3e91GuaP+/e0=

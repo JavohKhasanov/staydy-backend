@@ -114,6 +114,7 @@ type Querier interface {
 	GetAssignmentForStudent(ctx context.Context, arg GetAssignmentForStudentParams) (HomeworkAssignment, error)
 	GetBotConversation(ctx context.Context, telegramChatID int64) (BotConversation, error)
 	GetCourse(ctx context.Context, arg GetCourseParams) (Course, error)
+	GetGamification(ctx context.Context, id uuid.UUID) (GetGamificationRow, error)
 	GetGraceLessons(ctx context.Context, id uuid.UUID) (int32, error)
 	GetGroup(ctx context.Context, id uuid.UUID) (Group, error)
 	GetInterventionTask(ctx context.Context, id uuid.UUID) (InterventionTask, error)
@@ -207,6 +208,7 @@ type Querier interface {
 	RevokeRefreshSession(ctx context.Context, id uuid.UUID) error
 	RiskByGroup(ctx context.Context) ([]RiskByGroupRow, error)
 	SetBotConversationFlow(ctx context.Context, arg SetBotConversationFlowParams) error
+	SetGamification(ctx context.Context, arg SetGamificationParams) error
 	SetGraceLessons(ctx context.Context, arg SetGraceLessonsParams) error
 	SetLeadStage(ctx context.Context, arg SetLeadStageParams) (Lead, error)
 	SetStudentLoginPassword(ctx context.Context, arg SetStudentLoginPasswordParams) error

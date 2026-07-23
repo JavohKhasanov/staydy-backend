@@ -140,12 +140,15 @@ type StudentAuthRepository interface {
 	LookupByPhone(ctx context.Context, phone string) ([]entity.StudentAccount, error)
 }
 
-// PointsRepository records gamification awards/spends and reads leaderboards.
+// PointsRepository records gamification awards/spends, reads leaderboards, and holds the per-center
+// economy config.
 type PointsRepository interface {
-	Award(ctx context.Context, orgID, studentID uuid.UUID, kind string, xp, coins int, ref string) (bool, error)
+	Award(ctx context.Context, orgID, studentID uuid.UUID, kind string, xp int, ref string, cfg entity.GamificationConfig) (bool, error)
 	Spend(ctx context.Context, orgID, studentID uuid.UUID, coins int, ref string) error
 	Leaderboard(ctx context.Context, orgID uuid.UUID, limit int) ([]entity.LeaderRow, error)
 	LeaderboardByGroup(ctx context.Context, orgID, groupID uuid.UUID, limit int) ([]entity.LeaderRow, error)
+	GetConfig(ctx context.Context, orgID uuid.UUID) (entity.GamificationConfig, error)
+	SetConfig(ctx context.Context, orgID uuid.UUID, cfg entity.GamificationConfig) error
 }
 
 // ShopRepository persists reward-shop items + purchases, RLS-scoped.

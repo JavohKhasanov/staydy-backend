@@ -247,16 +247,23 @@ type ObstacleOption struct {
 }
 
 type Organization struct {
-	ID            uuid.UUID          `json:"id"`
-	Name          string             `json:"name"`
-	Slug          string             `json:"slug"`
-	Plan          string             `json:"plan"`
-	Status        string             `json:"status"`
-	TrialEndsAt   pgtype.Timestamptz `json:"trial_ends_at"`
-	BillingStatus string             `json:"billing_status"`
-	GraceLessons  int32              `json:"grace_lessons"`
-	CreatedAt     pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
+	ID              uuid.UUID          `json:"id"`
+	Name            string             `json:"name"`
+	Slug            string             `json:"slug"`
+	Plan            string             `json:"plan"`
+	Status          string             `json:"status"`
+	TrialEndsAt     pgtype.Timestamptz `json:"trial_ends_at"`
+	BillingStatus   string             `json:"billing_status"`
+	GraceLessons    int32              `json:"grace_lessons"`
+	GxXpAttend      int32              `json:"gx_xp_attend"`
+	GxXpLate        int32              `json:"gx_xp_late"`
+	GxXpHomeworkMax int32              `json:"gx_xp_homework_max"`
+	GxXpCheckin     int32              `json:"gx_xp_checkin"`
+	GxLevelSize     int32              `json:"gx_level_size"`
+	GxCoinBase      int32              `json:"gx_coin_base"`
+	GxCoinStep      int32              `json:"gx_coin_step"`
+	CreatedAt       pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
 }
 
 type Payment struct {

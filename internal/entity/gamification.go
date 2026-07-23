@@ -6,41 +6,64 @@ const (
 	PointHomeworkSubmit = "homework_submit"
 	PointHomeworkAccept = "homework_accept"
 	PointCheckin        = "checkin"
-	PointPurchase       = "purchase"
+	PointExam           = "exam"
 	PointManual         = "manual"
+	PointPurchase       = "purchase"
 )
 
-// XP / coin rewards per action (tunable). A student earns these automatically as they attend, do
-// homework, and check in — the values behind the mini app's momentum meter and leaderboard.
-const (
-	XPAttendance    = 10
-	CoinsAttendance = 5
+// GamificationConfig is a center's tunable XP/coin economy. XP is earned from actions and drives
+// level + rating (never spent). Coins are derived from earned XP at a level-scaled rate and are
+// spendable in the shop: coins = xp * (CoinBase + (level-1) * CoinStep); level = xp / LevelSize + 1.
+type GamificationConfig struct {
+	XPAttend      int // on-time attendance
+	XPLate        int // late attendance
+	XPHomeworkMax int // teacher grades homework 0..this
+	XPCheckin     int // weekly check-in
+	LevelSize     int // XP per level
+	CoinBase      int // coins per XP at level 1
+	CoinStep      int // extra coins per XP for each level above 1
+}
 
-	XPHomeworkOnTime    = 20
-	CoinsHomeworkOnTime = 10
-	XPHomeworkLate      = 10 // late submission still earns some XP, no coins
+// DefaultGamification is the standard economy a new center starts with.
+func DefaultGamification() GamificationConfig {
+	return GamificationConfig{
+		XPAttend: 2, XPLate: 1, XPHomeworkMax: 5, XPCheckin: 2,
+		LevelSize: 300, CoinBase: 4, CoinStep: 1,
+	}
+}
 
-	CoinsHomeworkAccept = 5 // XP for an accepted submission is the graded score itself
-
-	XPCheckin    = 15
-	CoinsCheckin = 10
-)
-
-// XPPerLevel is the XP needed to advance one Bosqich (level). Flat for now; tune later.
-const XPPerLevel = 1000
-
-// Level is the student's current Bosqich (1-based) for a total XP.
-func Level(xp int) int {
+// LevelForXP is the 1-based Bosqich for a cumulative XP.
+func (c GamificationConfig) LevelForXP(xp int) int {
+	if c.LevelSize <= 0 {
+		return 1
+	}
 	if xp < 0 {
 		xp = 0
 	}
-	return xp/XPPerLevel + 1
+	return xp/c.LevelSize + 1
 }
 
-// XPIntoLevel is progress within the current level (0..XPPerLevel-1).
-func XPIntoLevel(xp int) int {
-	if xp < 0 {
+// XPIntoLevel is progress within the current level (0..LevelSize-1).
+func (c GamificationConfig) XPIntoLevel(xp int) int {
+	if c.LevelSize <= 0 || xp < 0 {
 		return 0
 	}
-	return xp % XPPerLevel
+	return xp % c.LevelSize
+}
+
+// CoinRateAtLevel is how many coins each XP is worth at a level (grows with level).
+func (c GamificationConfig) CoinRateAtLevel(level int) int {
+	r := c.CoinBase + (level-1)*c.CoinStep
+	if r < 0 {
+		r = 0
+	}
+	return r
+}
+
+// CoinsForAward is the coins earned for an XP award, priced at the student's current level.
+func (c GamificationConfig) CoinsForAward(xpAward, currentXP int) int {
+	if xpAward <= 0 {
+		return 0
+	}
+	return xpAward * c.CoinRateAtLevel(c.LevelForXP(currentXP))
 }

@@ -135,6 +135,7 @@ func NewServer(deps Dependencies) *Server {
 	registerStudentApp(studentAPI, deps.Students, deps.Points, deps.Logger)
 	registerStudentHomework(studentAPI, deps.Homework, deps.Logger)
 	registerStudentShop(studentAPI, deps.Shop, deps.Points, deps.Logger)
+	registerStudentData(studentAPI, deps.Groups, deps.Finance, deps.Logger)
 
 	// Homework management + the staff leaderboard: teachers (scoped to their own groups) plus
 	// admins/managers.

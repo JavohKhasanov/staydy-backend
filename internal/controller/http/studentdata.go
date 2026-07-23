@@ -48,7 +48,7 @@ type studentSelfFinanceOutput struct {
 // registerStudentData mounts the student's own groups + finance. Mount on the student group.
 func registerStudentData(api huma.API, groups *groupusecase.Service, finance *financeusecase.Service, log zerolog.Logger) {
 	Register(api, BearerOperation(huma.Operation{
-		OperationID: "student-groups",
+		OperationID: "student-my-groups",
 		Method:      http.MethodGet,
 		Path:        "/student/groups",
 		Summary:     "The student's own groups",
@@ -75,7 +75,7 @@ func registerStudentData(api huma.API, groups *groupusecase.Service, finance *fi
 	})
 
 	Register(api, BearerOperation(huma.Operation{
-		OperationID: "student-finance",
+		OperationID: "student-my-finance",
 		Method:      http.MethodGet,
 		Path:        "/student/finance",
 		Summary:     "The student's own invoices, payments and balance",

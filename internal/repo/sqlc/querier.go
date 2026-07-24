@@ -158,6 +158,7 @@ type Querier interface {
 	InsertPointsIfNew(ctx context.Context, arg InsertPointsIfNewParams) (uuid.UUID, error)
 	InsertPurchase(ctx context.Context, arg InsertPurchaseParams) (uuid.UUID, error)
 	InsertSalaryGroupRule(ctx context.Context, arg InsertSalaryGroupRuleParams) (SalaryGroupRule, error)
+	InterventionEffectiveness(ctx context.Context) (InterventionEffectivenessRow, error)
 	LeaderboardGroup(ctx context.Context, arg LeaderboardGroupParams) ([]LeaderboardGroupRow, error)
 	// --- leaderboard ---
 	LeaderboardOrg(ctx context.Context, limit int32) ([]LeaderboardOrgRow, error)
@@ -228,6 +229,10 @@ type Querier interface {
 	OverdueInvoices(ctx context.Context) ([]OverdueInvoicesRow, error)
 	RemoveGroupMember(ctx context.Context, arg RemoveGroupMemberParams) error
 	ResolveInterventionTask(ctx context.Context, arg ResolveInterventionTaskParams) (InterventionTask, error)
+	// Students grouped by join month (start_date, else created_at): how many of each cohort remain.
+	RetentionCohorts(ctx context.Context) ([]RetentionCohortsRow, error)
+	// --- retention analytics (RLS-scoped: run inside WithTenant) ---
+	RetentionStatusCounts(ctx context.Context) (RetentionStatusCountsRow, error)
 	RevokeAllUserSessions(ctx context.Context, userID uuid.UUID) error
 	RevokeRefreshSession(ctx context.Context, id uuid.UUID) error
 	RiskByGroup(ctx context.Context) ([]RiskByGroupRow, error)

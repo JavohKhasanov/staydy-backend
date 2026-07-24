@@ -2935,6 +2935,35 @@ func (q *Queries) InsertSalaryGroupRule(ctx context.Context, arg InsertSalaryGro
 	return i, err
 }
 
+const interventionEffectiveness = `-- name: InterventionEffectiveness :one
+SELECT
+  count(*) FILTER (WHERE status <> 'Resolved')                                                     AS open,
+  count(*) FILTER (WHERE status = 'Resolved')                                                      AS resolved,
+  count(*) FILTER (WHERE status = 'Resolved' AND resolved_at >= now() - interval '30 days')        AS resolved30d,
+  coalesce(avg(EXTRACT(EPOCH FROM (resolved_at - created_at)) / 86400.0)
+           FILTER (WHERE status = 'Resolved' AND resolved_at IS NOT NULL), 0)::float8              AS avg_resolve_days
+FROM intervention_tasks
+`
+
+type InterventionEffectivenessRow struct {
+	Open           int64   `json:"open"`
+	Resolved       int64   `json:"resolved"`
+	Resolved30d    int64   `json:"resolved30d"`
+	AvgResolveDays float64 `json:"avg_resolve_days"`
+}
+
+func (q *Queries) InterventionEffectiveness(ctx context.Context) (InterventionEffectivenessRow, error) {
+	row := q.db.QueryRow(ctx, interventionEffectiveness)
+	var i InterventionEffectivenessRow
+	err := row.Scan(
+		&i.Open,
+		&i.Resolved,
+		&i.Resolved30d,
+		&i.AvgResolveDays,
+	)
+	return i, err
+}
+
 const leaderboardGroup = `-- name: LeaderboardGroup :many
 SELECT s.id, s.name, s.xp, s.coins FROM students s
 JOIN group_members m ON m.student_id = s.id AND m.group_id = $1::uuid
@@ -4975,6 +5004,88 @@ func (q *Queries) ResolveInterventionTask(ctx context.Context, arg ResolveInterv
 		&i.EscalatedAt,
 		&i.CreatedAt,
 		&i.ResolvedAt,
+	)
+	return i, err
+}
+
+const retentionCohorts = `-- name: RetentionCohorts :many
+SELECT
+  to_char(date_trunc('month', coalesce(start_date, created_at::date)), 'YYYY-MM')::text AS cohort,
+  count(*)                                          AS total,
+  count(*) FILTER (WHERE status = 'active')         AS active,
+  count(*) FILTER (WHERE status = 'dropped')       AS dropped
+FROM students
+WHERE status <> 'lead'
+GROUP BY 1
+ORDER BY 1 DESC
+LIMIT 12
+`
+
+type RetentionCohortsRow struct {
+	Cohort  string `json:"cohort"`
+	Total   int64  `json:"total"`
+	Active  int64  `json:"active"`
+	Dropped int64  `json:"dropped"`
+}
+
+// Students grouped by join month (start_date, else created_at): how many of each cohort remain.
+func (q *Queries) RetentionCohorts(ctx context.Context) ([]RetentionCohortsRow, error) {
+	rows, err := q.db.Query(ctx, retentionCohorts)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []RetentionCohortsRow{}
+	for rows.Next() {
+		var i RetentionCohortsRow
+		if err := rows.Scan(
+			&i.Cohort,
+			&i.Total,
+			&i.Active,
+			&i.Dropped,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const retentionStatusCounts = `-- name: RetentionStatusCounts :one
+
+SELECT
+  count(*) FILTER (WHERE status <> 'lead')                              AS total,
+  count(*) FILTER (WHERE status = 'active')                             AS active,
+  count(*) FILTER (WHERE status = 'dropped')                           AS dropped,
+  count(*) FILTER (WHERE status = 'active' AND risk_tier = 'Green')     AS green,
+  count(*) FILTER (WHERE status = 'active' AND risk_tier = 'Yellow')    AS yellow,
+  count(*) FILTER (WHERE status = 'active' AND risk_tier = 'Red')       AS red
+FROM students
+`
+
+type RetentionStatusCountsRow struct {
+	Total   int64 `json:"total"`
+	Active  int64 `json:"active"`
+	Dropped int64 `json:"dropped"`
+	Green   int64 `json:"green"`
+	Yellow  int64 `json:"yellow"`
+	Red     int64 `json:"red"`
+}
+
+// --- retention analytics (RLS-scoped: run inside WithTenant) ---
+func (q *Queries) RetentionStatusCounts(ctx context.Context) (RetentionStatusCountsRow, error) {
+	row := q.db.QueryRow(ctx, retentionStatusCounts)
+	var i RetentionStatusCountsRow
+	err := row.Scan(
+		&i.Total,
+		&i.Active,
+		&i.Dropped,
+		&i.Green,
+		&i.Yellow,
+		&i.Red,
 	)
 	return i, err
 }

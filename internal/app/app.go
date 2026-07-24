@@ -30,6 +30,7 @@ import (
 	groupusecase "github.com/student-success/backend/internal/usecase/group"
 	leadusecase "github.com/student-success/backend/internal/usecase/lead"
 	lessonusecase "github.com/student-success/backend/internal/usecase/lesson"
+	analyticsusecase "github.com/student-success/backend/internal/usecase/analytics"
 	interventionusecase "github.com/student-success/backend/internal/usecase/intervention"
 	notifyusecase "github.com/student-success/backend/internal/usecase/notify"
 	branchusecase "github.com/student-success/backend/internal/usecase/branch"
@@ -84,6 +85,7 @@ func New(ctx context.Context, cfg *config.Config) (*Application, error) {
 	homeworkRepo := repopg.NewHomeworkRepository(db)
 	interventionRepo := repopg.NewInterventionRepository(db)
 	notificationRepo := repopg.NewNotificationRepository(db)
+	analyticsRepo := repopg.NewAnalyticsRepository(db)
 	retentionRepo := repopg.NewRetentionRepository(db)
 	dashboardRepo := repopg.NewDashboardRepository(db)
 	groupRepo := repopg.NewGroupRepository(db)
@@ -113,6 +115,7 @@ func New(ctx context.Context, cfg *config.Config) (*Application, error) {
 	studentService := studentusecase.NewService(studentRepo, surveyRepo, attendanceRepo, homeworkRepo, retentionRepo)
 	interventionService := interventionusecase.NewService(interventionRepo)
 	notifyService := notifyusecase.NewService(notificationRepo, log)
+	analyticsService := analyticsusecase.NewService(analyticsRepo)
 	groupService := groupusecase.NewService(groupRepo, teacherRepo, studentRepo)
 	teacherService := teacherusecase.NewService(teacherRepo)
 	staffService := staffusecase.NewService(staffRepo)
@@ -176,6 +179,7 @@ func New(ctx context.Context, cfg *config.Config) (*Application, error) {
 		Branches:      branchService,
 		Rooms:         roomService,
 		Notify:        notifyService,
+		Analytics:     analyticsService,
 	})
 
 	return &Application{log: log, db: db, server: server, sessions: sessionRepo, telegram: telegramClient, bot: botService, maintenance: maintenanceService}, nil

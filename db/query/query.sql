@@ -1003,3 +1003,37 @@ WHERE telegram_chat_id = $1;
 
 -- name: SetStudentTelegramChat :exec
 UPDATE students SET telegram_chat_id = $2, updated_at = now() WHERE id = $1;
+
+-- --- retention analytics (RLS-scoped: run inside WithTenant) ---
+
+-- name: RetentionStatusCounts :one
+SELECT
+  count(*) FILTER (WHERE status <> 'lead')                              AS total,
+  count(*) FILTER (WHERE status = 'active')                             AS active,
+  count(*) FILTER (WHERE status = 'dropped')                           AS dropped,
+  count(*) FILTER (WHERE status = 'active' AND risk_tier = 'Green')     AS green,
+  count(*) FILTER (WHERE status = 'active' AND risk_tier = 'Yellow')    AS yellow,
+  count(*) FILTER (WHERE status = 'active' AND risk_tier = 'Red')       AS red
+FROM students;
+
+-- name: RetentionCohorts :many
+-- Students grouped by join month (start_date, else created_at): how many of each cohort remain.
+SELECT
+  to_char(date_trunc('month', coalesce(start_date, created_at::date)), 'YYYY-MM')::text AS cohort,
+  count(*)                                          AS total,
+  count(*) FILTER (WHERE status = 'active')         AS active,
+  count(*) FILTER (WHERE status = 'dropped')       AS dropped
+FROM students
+WHERE status <> 'lead'
+GROUP BY 1
+ORDER BY 1 DESC
+LIMIT 12;
+
+-- name: InterventionEffectiveness :one
+SELECT
+  count(*) FILTER (WHERE status <> 'Resolved')                                                     AS open,
+  count(*) FILTER (WHERE status = 'Resolved')                                                      AS resolved,
+  count(*) FILTER (WHERE status = 'Resolved' AND resolved_at >= now() - interval '30 days')        AS resolved30d,
+  coalesce(avg(EXTRACT(EPOCH FROM (resolved_at - created_at)) / 86400.0)
+           FILTER (WHERE status = 'Resolved' AND resolved_at IS NOT NULL), 0)::float8              AS avg_resolve_days
+FROM intervention_tasks;

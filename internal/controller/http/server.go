@@ -26,6 +26,7 @@ import (
 	courseusecase "github.com/student-success/backend/internal/usecase/course"
 	enrollmentusecase "github.com/student-success/backend/internal/usecase/enrollment"
 	financeusecase "github.com/student-success/backend/internal/usecase/finance"
+	analyticsusecase "github.com/student-success/backend/internal/usecase/analytics"
 	interventionusecase "github.com/student-success/backend/internal/usecase/intervention"
 	notifyusecase "github.com/student-success/backend/internal/usecase/notify"
 	leadusecase "github.com/student-success/backend/internal/usecase/lead"
@@ -79,6 +80,7 @@ type Dependencies struct {
 	Branches      *branchusecase.Service
 	Rooms         *roomusecase.Service
 	Notify        *notifyusecase.Service
+	Analytics     *analyticsusecase.Service
 }
 
 type Server struct {
@@ -177,6 +179,7 @@ func NewServer(deps Dependencies) *Server {
 	staffReadAPI := huma.NewGroup(api, "/api/v1")
 	staffReadAPI.UseMiddleware(RequireAuth(api, deps.TokenManager))
 	staffReadAPI.UseMiddleware(RequireRole(api, entity.RoleManager, entity.RoleFinance, entity.RoleCenterAdmin, entity.RoleSuperAdmin))
+	registerAnalytics(staffReadAPI, deps.Analytics, deps.Logger)
 
 	// Operational center management (groups, courses, schedule, attendance, teachers, rooms,
 	// settings). Director + administrator(manager); NOT finance (money-only).

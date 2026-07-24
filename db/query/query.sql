@@ -336,6 +336,11 @@ SELECT coalesce(password_hash, '') FROM students WHERE id = $1;
 INSERT INTO homework_assignments (org_id, group_id, lesson_date, title, description, deadline, max_score)
 VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *;
 
+-- name: UpdateHomeworkAssignment :one
+-- Edit an assignment (retitle, re-describe, extend the deadline, adjust max score).
+UPDATE homework_assignments SET title = $2, description = $3, deadline = $4, max_score = $5
+WHERE id = $1 RETURNING *;
+
 -- name: ListGroupAssignments :many
 SELECT a.*,
   (SELECT count(*) FROM homework_submissions s WHERE s.assignment_id = a.id)::bigint AS submission_count

@@ -234,6 +234,8 @@ type Querier interface {
 	UpdateCourse(ctx context.Context, arg UpdateCourseParams) (Course, error)
 	UpdateEnrollment(ctx context.Context, arg UpdateEnrollmentParams) (Enrollment, error)
 	UpdateGroup(ctx context.Context, arg UpdateGroupParams) (Group, error)
+	// Edit an assignment (retitle, re-describe, extend the deadline, adjust max score).
+	UpdateHomeworkAssignment(ctx context.Context, arg UpdateHomeworkAssignmentParams) (HomeworkAssignment, error)
 	UpdateLead(ctx context.Context, arg UpdateLeadParams) (Lead, error)
 	UpdateLesson(ctx context.Context, arg UpdateLessonParams) (Lesson, error)
 	// Refresh the reasons on a student's already-open task so it reflects the latest risk drivers

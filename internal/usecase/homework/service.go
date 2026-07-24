@@ -84,6 +84,36 @@ func (s *Service) CreateAssignment(ctx context.Context, actor entity.Principal, 
 	})
 }
 
+// UpdateInput edits an assignment; the teacher who owns the group may retitle, re-describe, extend
+// the deadline, or change the max score.
+type UpdateInput struct {
+	Title       string
+	Description string
+	Deadline    *time.Time
+	MaxScore    int
+}
+
+func (s *Service) UpdateAssignment(ctx context.Context, actor entity.Principal, id uuid.UUID, in UpdateInput) (entity.HomeworkAssignment, error) {
+	a, err := s.repo.GetAssignment(ctx, actor.OrgID, id)
+	if err != nil {
+		return entity.HomeworkAssignment{}, err
+	}
+	if err := s.canManageGroup(ctx, actor.OrgID, a.GroupID, actor); err != nil {
+		return entity.HomeworkAssignment{}, err
+	}
+	title := strings.TrimSpace(in.Title)
+	if title == "" {
+		return entity.HomeworkAssignment{}, ErrValidation
+	}
+	maxScore := in.MaxScore
+	if maxScore <= 0 {
+		maxScore = a.MaxScore
+	}
+	return s.repo.UpdateAssignment(ctx, actor.OrgID, id, repo.UpdateAssignmentParams{
+		Title: title, Description: strings.TrimSpace(in.Description), Deadline: in.Deadline, MaxScore: maxScore,
+	})
+}
+
 func (s *Service) ListGroupAssignments(ctx context.Context, actor entity.Principal, groupID uuid.UUID) ([]entity.HomeworkAssignment, error) {
 	if err := s.canManageGroup(ctx, actor.OrgID, groupID, actor); err != nil {
 		return nil, err

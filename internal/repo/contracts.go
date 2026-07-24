@@ -173,9 +173,18 @@ type CreateAssignmentParams struct {
 	MaxScore    int
 }
 
+// UpdateAssignmentParams edits an existing assignment (retitle, re-describe, extend deadline, max).
+type UpdateAssignmentParams struct {
+	Title       string
+	Description string
+	Deadline    *time.Time
+	MaxScore    int
+}
+
 // AssignmentRepository persists homework assignments + submissions (LMS-style), RLS-scoped.
 type AssignmentRepository interface {
 	CreateAssignment(ctx context.Context, orgID uuid.UUID, p CreateAssignmentParams) (entity.HomeworkAssignment, error)
+	UpdateAssignment(ctx context.Context, orgID, id uuid.UUID, p UpdateAssignmentParams) (entity.HomeworkAssignment, error)
 	ListGroupAssignments(ctx context.Context, orgID, groupID uuid.UUID) ([]entity.HomeworkAssignment, error)
 	GetAssignment(ctx context.Context, orgID, id uuid.UUID) (entity.HomeworkAssignment, error)
 	DeleteAssignment(ctx context.Context, orgID, id uuid.UUID) error

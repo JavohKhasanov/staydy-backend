@@ -5240,6 +5240,43 @@ func (q *Queries) UpdateGroup(ctx context.Context, arg UpdateGroupParams) (Group
 	return i, err
 }
 
+const updateHomeworkAssignment = `-- name: UpdateHomeworkAssignment :one
+UPDATE homework_assignments SET title = $2, description = $3, deadline = $4, max_score = $5
+WHERE id = $1 RETURNING id, org_id, group_id, lesson_date, title, description, deadline, max_score, created_at
+`
+
+type UpdateHomeworkAssignmentParams struct {
+	ID          uuid.UUID          `json:"id"`
+	Title       string             `json:"title"`
+	Description string             `json:"description"`
+	Deadline    pgtype.Timestamptz `json:"deadline"`
+	MaxScore    int32              `json:"max_score"`
+}
+
+// Edit an assignment (retitle, re-describe, extend the deadline, adjust max score).
+func (q *Queries) UpdateHomeworkAssignment(ctx context.Context, arg UpdateHomeworkAssignmentParams) (HomeworkAssignment, error) {
+	row := q.db.QueryRow(ctx, updateHomeworkAssignment,
+		arg.ID,
+		arg.Title,
+		arg.Description,
+		arg.Deadline,
+		arg.MaxScore,
+	)
+	var i HomeworkAssignment
+	err := row.Scan(
+		&i.ID,
+		&i.OrgID,
+		&i.GroupID,
+		&i.LessonDate,
+		&i.Title,
+		&i.Description,
+		&i.Deadline,
+		&i.MaxScore,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const updateLead = `-- name: UpdateLead :one
 UPDATE leads
 SET name = $3, phone = $4, email = $5, source = $6, stage = $7, interest = $8, note = $9,

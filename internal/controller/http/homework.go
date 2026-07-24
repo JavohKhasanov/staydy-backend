@@ -39,6 +39,16 @@ type submissionResponse struct {
 	ReviewedAt  *string `json:"reviewedAt,omitempty"`
 }
 
+type updateAssignmentInput struct {
+	ID   string `path:"id" format:"uuid"` // assignment id
+	Body struct {
+		Title       string `json:"title" minLength:"1" maxLength:"200"`
+		Description string `json:"description,omitempty" maxLength:"4000"`
+		Deadline    string `json:"deadline,omitempty" doc:"RFC3339 datetime; empty clears the deadline"`
+		MaxScore    int    `json:"maxScore,omitempty" minimum:"0"`
+	}
+}
+
 type createAssignmentInput struct {
 	ID   string `path:"id" format:"uuid"` // group id
 	Body struct {
@@ -114,6 +124,31 @@ func registerHomework(api huma.API, svc *homeworkusecase.Service, log zerolog.Lo
 			out.Body = append(out.Body, toAssignmentResponse(a))
 		}
 		return out, nil
+	})
+
+	Register(api, BearerOperation(huma.Operation{
+		OperationID: "homework-update",
+		Method:      http.MethodPatch,
+		Path:        "/homework/{id}",
+		Summary:     "Edit an assignment (retitle, extend deadline, adjust max score)",
+		Tags:        []string{"homework"},
+		Errors:      []int{http.StatusUnprocessableEntity, http.StatusForbidden, http.StatusNotFound, http.StatusInternalServerError},
+	}), func(ctx context.Context, in *updateAssignmentInput) (*assignmentOutput, error) {
+		p, id, err := orgAndID(ctx, in.ID)
+		if err != nil {
+			return nil, err
+		}
+		deadline, _, derr := parseHomeworkDates(in.Body.Deadline, "")
+		if derr != nil {
+			return nil, derr
+		}
+		a, err := svc.UpdateAssignment(ctx, p, id, homeworkusecase.UpdateInput{
+			Title: in.Body.Title, Description: in.Body.Description, Deadline: deadline, MaxScore: in.Body.MaxScore,
+		})
+		if err != nil {
+			return nil, mapHomeworkError(err, log)
+		}
+		return &assignmentOutput{Body: toAssignmentResponse(a)}, nil
 	})
 
 	Register(api, BearerOperation(huma.Operation{

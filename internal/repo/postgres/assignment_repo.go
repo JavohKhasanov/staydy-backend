@@ -66,6 +66,28 @@ func (r *AssignmentRepository) CreateAssignment(ctx context.Context, orgID uuid.
 	return a, nil
 }
 
+func (r *AssignmentRepository) UpdateAssignment(ctx context.Context, orgID, id uuid.UUID, p repo.UpdateAssignmentParams) (entity.HomeworkAssignment, error) {
+	var a entity.HomeworkAssignment
+	err := r.db.WithTenant(ctx, orgID.String(), func(tx pgx.Tx) error {
+		row, e := sqlc.New(tx).UpdateHomeworkAssignment(ctx, sqlc.UpdateHomeworkAssignmentParams{
+			ID:          id,
+			Title:       p.Title,
+			Description: p.Description,
+			Deadline:    tsPtrVal(p.Deadline),
+			MaxScore:    int32(p.MaxScore),
+		})
+		if e != nil {
+			return e
+		}
+		a = mapAssignment(row)
+		return nil
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return entity.HomeworkAssignment{}, repo.ErrNotFound
+	}
+	return a, err
+}
+
 func (r *AssignmentRepository) ListGroupAssignments(ctx context.Context, orgID, groupID uuid.UUID) ([]entity.HomeworkAssignment, error) {
 	var out []entity.HomeworkAssignment
 	err := r.db.WithTenant(ctx, orgID.String(), func(tx pgx.Tx) error {

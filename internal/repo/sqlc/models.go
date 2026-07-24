@@ -170,6 +170,7 @@ type InterventionTask struct {
 	Reasons           []string           `json:"reasons"`
 	Status            string             `json:"status"`
 	ResolutionComment pgtype.Text        `json:"resolution_comment"`
+	AssignedTo        pgtype.UUID        `json:"assigned_to"`
 	CreatedAt         pgtype.Timestamptz `json:"created_at"`
 	ResolvedAt        pgtype.Timestamptz `json:"resolved_at"`
 }

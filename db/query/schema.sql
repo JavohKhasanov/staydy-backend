@@ -542,6 +542,7 @@ CREATE TABLE intervention_tasks (
     reasons            text[] NOT NULL DEFAULT '{}',
     status             text NOT NULL DEFAULT 'Open',
     resolution_comment text,
+    assigned_to        uuid REFERENCES users(id) ON DELETE SET NULL,
     created_at         timestamptz NOT NULL DEFAULT now(),
     resolved_at        timestamptz,
     FOREIGN KEY (org_id, student_id) REFERENCES students (org_id, id) ON DELETE CASCADE

@@ -350,6 +350,7 @@ func mapTask(t sqlc.InterventionTask) entity.InterventionTask {
 		Reasons:           t.Reasons,
 		Status:            t.Status,
 		ResolutionComment: textToString(t.ResolutionComment),
+		AssignedTo:        uuidToPtr(t.AssignedTo),
 		CreatedAt:         t.CreatedAt.Time,
 		ResolvedAt:        tsToPtr(t.ResolvedAt),
 	}
@@ -364,6 +365,8 @@ func mapTaskRow(t sqlc.ListInterventionTasksRow) entity.InterventionTask {
 		Reasons:           t.Reasons,
 		Status:            t.Status,
 		ResolutionComment: textToString(t.ResolutionComment),
+		AssignedTo:        uuidToPtr(t.AssignedTo),
+		AssignedToName:    t.AssignedToName,
 		CreatedAt:         t.CreatedAt.Time,
 		ResolvedAt:        tsToPtr(t.ResolvedAt),
 	}

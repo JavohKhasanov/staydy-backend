@@ -67,6 +67,8 @@ type InterventionTask struct {
 	Reasons           []string
 	Status            string // Open | In Progress | Resolved
 	ResolutionComment string
+	AssignedTo        *uuid.UUID // staff member responsible (nil = unassigned)
+	AssignedToName    string     // joined on list
 	CreatedAt         time.Time
 	ResolvedAt        *time.Time
 }

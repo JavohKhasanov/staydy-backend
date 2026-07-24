@@ -59,6 +59,33 @@ func (q *Queries) AdjustInvoicePaid(ctx context.Context, arg AdjustInvoicePaidPa
 	return err
 }
 
+const assignInterventionTask = `-- name: AssignInterventionTask :one
+UPDATE intervention_tasks SET assigned_to = $2 WHERE id = $1 RETURNING id, org_id, student_id, reasons, status, resolution_comment, assigned_to, created_at, resolved_at
+`
+
+type AssignInterventionTaskParams struct {
+	ID         uuid.UUID   `json:"id"`
+	AssignedTo pgtype.UUID `json:"assigned_to"`
+}
+
+// Assign (or clear, with NULL) the staff member responsible for a task.
+func (q *Queries) AssignInterventionTask(ctx context.Context, arg AssignInterventionTaskParams) (InterventionTask, error) {
+	row := q.db.QueryRow(ctx, assignInterventionTask, arg.ID, arg.AssignedTo)
+	var i InterventionTask
+	err := row.Scan(
+		&i.ID,
+		&i.OrgID,
+		&i.StudentID,
+		&i.Reasons,
+		&i.Status,
+		&i.ResolutionComment,
+		&i.AssignedTo,
+		&i.CreatedAt,
+		&i.ResolvedAt,
+	)
+	return i, err
+}
+
 const assignStudentGroup = `-- name: AssignStudentGroup :exec
 UPDATE students
 SET group_id    = $2,
@@ -687,7 +714,7 @@ const createInterventionTask = `-- name: CreateInterventionTask :one
 INSERT INTO intervention_tasks (org_id, student_id, reasons, status)
 VALUES ($1, $2, $3, $4)
 ON CONFLICT (org_id, student_id) WHERE status <> 'Resolved' DO NOTHING
-RETURNING id, org_id, student_id, reasons, status, resolution_comment, created_at, resolved_at
+RETURNING id, org_id, student_id, reasons, status, resolution_comment, assigned_to, created_at, resolved_at
 `
 
 type CreateInterventionTaskParams struct {
@@ -715,6 +742,7 @@ func (q *Queries) CreateInterventionTask(ctx context.Context, arg CreateInterven
 		&i.Reasons,
 		&i.Status,
 		&i.ResolutionComment,
+		&i.AssignedTo,
 		&i.CreatedAt,
 		&i.ResolvedAt,
 	)
@@ -2067,7 +2095,7 @@ func (q *Queries) GetGroup(ctx context.Context, id uuid.UUID) (Group, error) {
 }
 
 const getInterventionTask = `-- name: GetInterventionTask :one
-SELECT id, org_id, student_id, reasons, status, resolution_comment, created_at, resolved_at FROM intervention_tasks WHERE id = $1
+SELECT id, org_id, student_id, reasons, status, resolution_comment, assigned_to, created_at, resolved_at FROM intervention_tasks WHERE id = $1
 `
 
 func (q *Queries) GetInterventionTask(ctx context.Context, id uuid.UUID) (InterventionTask, error) {
@@ -2080,6 +2108,7 @@ func (q *Queries) GetInterventionTask(ctx context.Context, id uuid.UUID) (Interv
 		&i.Reasons,
 		&i.Status,
 		&i.ResolutionComment,
+		&i.AssignedTo,
 		&i.CreatedAt,
 		&i.ResolvedAt,
 	)
@@ -3647,9 +3676,10 @@ func (q *Queries) ListHomeworkByStudent(ctx context.Context, studentID uuid.UUID
 }
 
 const listInterventionTasks = `-- name: ListInterventionTasks :many
-SELECT t.id, t.org_id, t.student_id, t.reasons, t.status, t.resolution_comment, t.created_at, t.resolved_at, s.name AS student_name
+SELECT t.id, t.org_id, t.student_id, t.reasons, t.status, t.resolution_comment, t.assigned_to, t.created_at, t.resolved_at, s.name AS student_name, coalesce(u.full_name, '') AS assigned_to_name
 FROM intervention_tasks t
 JOIN students s ON s.id = t.student_id
+LEFT JOIN users u ON u.id = t.assigned_to
 ORDER BY t.created_at DESC
 `
 
@@ -3660,9 +3690,11 @@ type ListInterventionTasksRow struct {
 	Reasons           []string           `json:"reasons"`
 	Status            string             `json:"status"`
 	ResolutionComment pgtype.Text        `json:"resolution_comment"`
+	AssignedTo        pgtype.UUID        `json:"assigned_to"`
 	CreatedAt         pgtype.Timestamptz `json:"created_at"`
 	ResolvedAt        pgtype.Timestamptz `json:"resolved_at"`
 	StudentName       string             `json:"student_name"`
+	AssignedToName    string             `json:"assigned_to_name"`
 }
 
 func (q *Queries) ListInterventionTasks(ctx context.Context) ([]ListInterventionTasksRow, error) {
@@ -3681,9 +3713,11 @@ func (q *Queries) ListInterventionTasks(ctx context.Context) ([]ListIntervention
 			&i.Reasons,
 			&i.Status,
 			&i.ResolutionComment,
+			&i.AssignedTo,
 			&i.CreatedAt,
 			&i.ResolvedAt,
 			&i.StudentName,
+			&i.AssignedToName,
 		); err != nil {
 			return nil, err
 		}
@@ -4738,7 +4772,7 @@ const resolveInterventionTask = `-- name: ResolveInterventionTask :one
 UPDATE intervention_tasks
 SET status = 'Resolved', resolution_comment = $2, resolved_at = now()
 WHERE id = $1 AND status <> 'Resolved'
-RETURNING id, org_id, student_id, reasons, status, resolution_comment, created_at, resolved_at
+RETURNING id, org_id, student_id, reasons, status, resolution_comment, assigned_to, created_at, resolved_at
 `
 
 type ResolveInterventionTaskParams struct {
@@ -4756,6 +4790,7 @@ func (q *Queries) ResolveInterventionTask(ctx context.Context, arg ResolveInterv
 		&i.Reasons,
 		&i.Status,
 		&i.ResolutionComment,
+		&i.AssignedTo,
 		&i.CreatedAt,
 		&i.ResolvedAt,
 	)
@@ -4976,7 +5011,7 @@ const startInterventionTask = `-- name: StartInterventionTask :one
 UPDATE intervention_tasks
 SET status = 'In Progress'
 WHERE id = $1 AND status = 'Open'
-RETURNING id, org_id, student_id, reasons, status, resolution_comment, created_at, resolved_at
+RETURNING id, org_id, student_id, reasons, status, resolution_comment, assigned_to, created_at, resolved_at
 `
 
 func (q *Queries) StartInterventionTask(ctx context.Context, id uuid.UUID) (InterventionTask, error) {
@@ -4989,6 +5024,7 @@ func (q *Queries) StartInterventionTask(ctx context.Context, id uuid.UUID) (Inte
 		&i.Reasons,
 		&i.Status,
 		&i.ResolutionComment,
+		&i.AssignedTo,
 		&i.CreatedAt,
 		&i.ResolvedAt,
 	)

@@ -35,6 +35,18 @@ func (s *Service) Start(ctx context.Context, orgID, id uuid.UUID) (entity.Interv
 	return s.tasks.Start(ctx, orgID, id)
 }
 
+// Assign sets (or clears, with nil) the staff member responsible for a task.
+func (s *Service) Assign(ctx context.Context, orgID, id uuid.UUID, assignedTo *uuid.UUID) (entity.InterventionTask, error) {
+	task, err := s.tasks.Assign(ctx, orgID, id, assignedTo)
+	if err != nil {
+		if errors.Is(err, repo.ErrNotFound) {
+			return entity.InterventionTask{}, ErrNotFound
+		}
+		return entity.InterventionTask{}, err
+	}
+	return task, nil
+}
+
 func (s *Service) Resolve(ctx context.Context, orgID, id uuid.UUID, comment string) (entity.InterventionTask, error) {
 	comment = strings.TrimSpace(comment)
 	if comment == "" {

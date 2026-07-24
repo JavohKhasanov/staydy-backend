@@ -23,12 +23,21 @@ type taskResponse struct {
 	SuggestedActions  []string `json:"suggestedActions"` // playbook: what to do about each reason
 	Status            string   `json:"status"`
 	ResolutionComment string   `json:"resolutionComment,omitempty"`
+	AssignedTo        string   `json:"assignedTo,omitempty"`     // staff user id (empty = unassigned)
+	AssignedToName    string   `json:"assignedToName,omitempty"` // joined on list
 	CreatedAt         string   `json:"createdAt"`
 	ResolvedAt        string   `json:"resolvedAt,omitempty"`
 }
 
 type resolveTaskRequest struct {
 	ResolutionComment string `json:"resolutionComment" minLength:"1" maxLength:"2000"`
+}
+
+type assignTaskInput struct {
+	ID   string `path:"id" format:"uuid"`
+	Body struct {
+		AssignedTo string `json:"assignedTo,omitempty" doc:"staff user id; empty/omitted clears the assignment"`
+	}
 }
 
 type listTasksInput struct{}
@@ -113,6 +122,37 @@ func registerInterventions(api huma.API, svc *interventionusecase.Service, log z
 		}
 		return &taskOutput{Body: toTaskResponse(task)}, nil
 	})
+
+	Register(api, BearerOperation(huma.Operation{
+		OperationID: "intervention-tasks-assign",
+		Method:      http.MethodPatch,
+		Path:        "/intervention-tasks/{id}/assign",
+		Summary:     "Assign (or clear) the staff member responsible for a task",
+		Tags:        []string{"intervention-tasks"},
+		Errors:      []int{http.StatusUnprocessableEntity, http.StatusNotFound, http.StatusInternalServerError},
+	}), func(ctx context.Context, in *assignTaskInput) (*taskOutput, error) {
+		p, err := principal(ctx)
+		if err != nil {
+			return nil, err
+		}
+		id, err := uuid.Parse(in.ID)
+		if err != nil {
+			return nil, huma.Error422UnprocessableEntity("invalid task id")
+		}
+		var assignee *uuid.UUID
+		if in.Body.AssignedTo != "" {
+			aid, perr := uuid.Parse(in.Body.AssignedTo)
+			if perr != nil {
+				return nil, huma.Error422UnprocessableEntity("invalid assignedTo id")
+			}
+			assignee = &aid
+		}
+		task, err := svc.Assign(ctx, p.OrgID, id, assignee)
+		if err != nil {
+			return nil, mapInterventionError(LangFromContext(ctx), err, log)
+		}
+		return &taskOutput{Body: toTaskResponse(task)}, nil
+	})
 }
 
 func toTaskResponse(t entity.InterventionTask) taskResponse {
@@ -124,7 +164,11 @@ func toTaskResponse(t entity.InterventionTask) taskResponse {
 		SuggestedActions:  interventionusecase.SuggestedActions(t.Reasons),
 		Status:            t.Status,
 		ResolutionComment: t.ResolutionComment,
+		AssignedToName:    t.AssignedToName,
 		CreatedAt:         t.CreatedAt.UTC().Format(time.RFC3339),
+	}
+	if t.AssignedTo != nil {
+		r.AssignedTo = t.AssignedTo.String()
 	}
 	if t.ResolvedAt != nil {
 		r.ResolvedAt = t.ResolvedAt.UTC().Format(time.RFC3339)

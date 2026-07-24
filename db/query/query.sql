@@ -872,13 +872,18 @@ SET reasons = $3
 WHERE org_id = $1 AND student_id = $2 AND status <> 'Resolved';
 
 -- name: ListInterventionTasks :many
-SELECT t.*, s.name AS student_name
+SELECT t.*, s.name AS student_name, coalesce(u.full_name, '') AS assigned_to_name
 FROM intervention_tasks t
 JOIN students s ON s.id = t.student_id
+LEFT JOIN users u ON u.id = t.assigned_to
 ORDER BY t.created_at DESC;
 
 -- name: GetInterventionTask :one
 SELECT * FROM intervention_tasks WHERE id = $1;
+
+-- name: AssignInterventionTask :one
+-- Assign (or clear, with NULL) the staff member responsible for a task.
+UPDATE intervention_tasks SET assigned_to = $2 WHERE id = $1 RETURNING *;
 
 -- name: StartInterventionTask :one
 UPDATE intervention_tasks

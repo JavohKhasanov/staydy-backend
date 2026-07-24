@@ -69,6 +69,25 @@ func (r *InterventionRepository) List(ctx context.Context, orgID uuid.UUID) ([]e
 	return out, nil
 }
 
+func (r *InterventionRepository) Assign(ctx context.Context, orgID, id uuid.UUID, assignedTo *uuid.UUID) (entity.InterventionTask, error) {
+	var row sqlc.InterventionTask
+	err := r.db.WithTenant(ctx, orgID.String(), func(tx pgx.Tx) error {
+		var e error
+		row, e = sqlc.New(tx).AssignInterventionTask(ctx, sqlc.AssignInterventionTaskParams{
+			ID:         id,
+			AssignedTo: nullableUUID(assignedTo),
+		})
+		return e
+	})
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return entity.InterventionTask{}, repo.ErrNotFound
+		}
+		return entity.InterventionTask{}, err
+	}
+	return mapTask(row), nil
+}
+
 func (r *InterventionRepository) Start(ctx context.Context, orgID, id uuid.UUID) (entity.InterventionTask, error) {
 	var row sqlc.InterventionTask
 	err := r.db.WithTenant(ctx, orgID.String(), func(tx pgx.Tx) error {

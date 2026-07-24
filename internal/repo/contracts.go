@@ -298,6 +298,8 @@ type InterventionRepository interface {
 	Resolve(ctx context.Context, orgID, id uuid.UUID, comment string) (entity.InterventionTask, error)
 	// Start moves an Open task to In Progress (ErrNotFound if missing or not Open).
 	Start(ctx context.Context, orgID, id uuid.UUID) (entity.InterventionTask, error)
+	// Assign sets (or clears, with nil) the staff member responsible for a task.
+	Assign(ctx context.Context, orgID, id uuid.UUID, assignedTo *uuid.UUID) (entity.InterventionTask, error)
 }
 
 // RiskOutcome is the persisted result of recomputing a student's risk inside the

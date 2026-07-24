@@ -16,6 +16,8 @@ type Querier interface {
 	// xp/coins may be negative (manual penalty); floor both at 0 so totals never go negative.
 	AddStudentPoints(ctx context.Context, arg AddStudentPointsParams) error
 	AdjustInvoicePaid(ctx context.Context, arg AdjustInvoicePaidParams) error
+	// Assign (or clear, with NULL) the staff member responsible for a task.
+	AssignInterventionTask(ctx context.Context, arg AssignInterventionTaskParams) (InterventionTask, error)
 	// Sets group_id AND denormalizes group_name to the group's name (or '' when unassigning), so the
 	// legacy group_name field stays in sync — the student list + dashboard read group_name.
 	AssignStudentGroup(ctx context.Context, arg AssignStudentGroupParams) error

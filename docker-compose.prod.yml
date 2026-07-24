@@ -53,6 +53,8 @@ services:
       # Browser origins allowed to call the API. Set here (overrides .env) so every real
       # frontend subdomain is version-controlled — add a new surface's domain when you ship it.
       CORS_ORIGINS: https://staydy.uz,https://www.staydy.uz,https://app.staydy.uz,https://admin.staydy.uz,https://student.staydy.uz
+      # 1h access token (was 15m) — fewer refresh cycles; the client also refreshes proactively.
+      JWT_ACCESS_TTL: 1h
     ports:
       # Bound to the docker0 gateway so Nginx Proxy Manager (a container) reaches it via 172.17.0.1;
       # not publicly exposed. Host port avoids the existing 808x/3000 services on this box.

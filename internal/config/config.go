@@ -41,7 +41,7 @@ type Database struct {
 type Auth struct {
 	Issuer     string        `yaml:"issuer" env:"JWT_ISSUER" env-default:"student-success"`
 	SigningKey string        `yaml:"signing_key" env:"JWT_SECRET" env-required:"true"`
-	AccessTTL  time.Duration `yaml:"access_ttl" env:"JWT_ACCESS_TTL" env-default:"15m"`
+	AccessTTL  time.Duration `yaml:"access_ttl" env:"JWT_ACCESS_TTL" env-default:"1h"`
 	RefreshTTL time.Duration `yaml:"refresh_ttl" env:"JWT_REFRESH_TTL" env-default:"720h"`
 }
 

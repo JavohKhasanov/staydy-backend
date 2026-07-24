@@ -27,6 +27,7 @@ import (
 	enrollmentusecase "github.com/student-success/backend/internal/usecase/enrollment"
 	financeusecase "github.com/student-success/backend/internal/usecase/finance"
 	analyticsusecase "github.com/student-success/backend/internal/usecase/analytics"
+	examusecase "github.com/student-success/backend/internal/usecase/exam"
 	interventionusecase "github.com/student-success/backend/internal/usecase/intervention"
 	notifyusecase "github.com/student-success/backend/internal/usecase/notify"
 	leadusecase "github.com/student-success/backend/internal/usecase/lead"
@@ -81,6 +82,7 @@ type Dependencies struct {
 	Rooms         *roomusecase.Service
 	Notify        *notifyusecase.Service
 	Analytics     *analyticsusecase.Service
+	Exams         *examusecase.Service
 }
 
 type Server struct {
@@ -138,6 +140,7 @@ func NewServer(deps Dependencies) *Server {
 	studentAPI.UseMiddleware(RequireRole(api, entity.RoleStudent))
 	registerStudentApp(studentAPI, deps.Students, deps.Points, deps.Logger)
 	registerStudentTelegramLink(studentAPI, deps.Bot, deps.Logger)
+	registerStudentExams(studentAPI, deps.Exams, deps.Logger)
 	registerStudentHomework(studentAPI, deps.Homework, deps.Logger)
 	registerStudentShop(studentAPI, deps.Shop, deps.Points, deps.Logger)
 	registerStudentData(studentAPI, deps.Groups, deps.Finance, deps.Logger)
@@ -151,6 +154,7 @@ func NewServer(deps Dependencies) *Server {
 	registerLeaderboard(teachingAPI, deps.Points, deps.Logger)
 	registerManualXP(teachingAPI, deps.Points, deps.Groups, deps.Logger)
 	registerStudentCredentials(teachingAPI, deps.Students, deps.Groups, deps.Logger)
+	registerExams(teachingAPI, deps.Exams, deps.Logger)
 	registerStudents(protectedAPI, deps.Students, deps.Logger)
 	registerInterventions(protectedAPI, deps.Interventions, deps.Notify, deps.Logger)
 	registerNotifications(protectedAPI, deps.Notify, deps.Logger)

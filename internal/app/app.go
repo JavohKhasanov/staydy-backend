@@ -31,6 +31,7 @@ import (
 	leadusecase "github.com/student-success/backend/internal/usecase/lead"
 	lessonusecase "github.com/student-success/backend/internal/usecase/lesson"
 	analyticsusecase "github.com/student-success/backend/internal/usecase/analytics"
+	examusecase "github.com/student-success/backend/internal/usecase/exam"
 	interventionusecase "github.com/student-success/backend/internal/usecase/intervention"
 	notifyusecase "github.com/student-success/backend/internal/usecase/notify"
 	branchusecase "github.com/student-success/backend/internal/usecase/branch"
@@ -126,6 +127,8 @@ func New(ctx context.Context, cfg *config.Config) (*Application, error) {
 	shopService := shopusecase.NewService(shopRepo)
 	studentService.SetAwarder(pointsService)
 	homeworkService.SetAwarder(pointsService)
+	examService := examusecase.NewService(repopg.NewExamRepository(db), groupRepo)
+	examService.SetAwarder(pointsService)
 	obstacleService := obstacleusecase.NewService(repopg.NewObstacleRepository(db))
 	courseService := courseusecase.NewService(repopg.NewCourseRepository(db))
 	enrollmentService := enrollmentusecase.NewService(repopg.NewEnrollmentRepository(db))
@@ -180,6 +183,7 @@ func New(ctx context.Context, cfg *config.Config) (*Application, error) {
 		Rooms:         roomService,
 		Notify:        notifyService,
 		Analytics:     analyticsService,
+		Exams:         examService,
 	})
 
 	return &Application{log: log, db: db, server: server, sessions: sessionRepo, telegram: telegramClient, bot: botService, maintenance: maintenanceService}, nil

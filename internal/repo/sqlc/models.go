@@ -88,6 +88,26 @@ type Enrollment struct {
 	CreatedAt pgtype.Timestamptz `json:"created_at"`
 }
 
+type Exam struct {
+	ID        uuid.UUID          `json:"id"`
+	OrgID     uuid.UUID          `json:"org_id"`
+	GroupID   uuid.UUID          `json:"group_id"`
+	Title     string             `json:"title"`
+	ExamDate  pgtype.Date        `json:"exam_date"`
+	MaxScore  int32              `json:"max_score"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+}
+
+type ExamResult struct {
+	ID        uuid.UUID          `json:"id"`
+	OrgID     uuid.UUID          `json:"org_id"`
+	ExamID    uuid.UUID          `json:"exam_id"`
+	StudentID uuid.UUID          `json:"student_id"`
+	Score     int32              `json:"score"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
+}
+
 type Expense struct {
 	ID        uuid.UUID          `json:"id"`
 	OrgID     uuid.UUID          `json:"org_id"`

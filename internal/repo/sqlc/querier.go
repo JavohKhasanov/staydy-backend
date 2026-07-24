@@ -44,6 +44,8 @@ type Querier interface {
 	CreateBranch(ctx context.Context, arg CreateBranchParams) (Branch, error)
 	CreateCourse(ctx context.Context, arg CreateCourseParams) (Course, error)
 	CreateEnrollment(ctx context.Context, arg CreateEnrollmentParams) (Enrollment, error)
+	// --- exams + results (RLS-scoped) ---
+	CreateExam(ctx context.Context, arg CreateExamParams) (Exam, error)
 	CreateExpense(ctx context.Context, arg CreateExpenseParams) (Expense, error)
 	// --- groups (RLS-scoped: run inside WithTenant) ---
 	CreateGroup(ctx context.Context, arg CreateGroupParams) (Group, error)
@@ -92,6 +94,7 @@ type Querier interface {
 	DeleteBranch(ctx context.Context, id uuid.UUID) error
 	DeleteCourse(ctx context.Context, arg DeleteCourseParams) error
 	DeleteEnrollment(ctx context.Context, arg DeleteEnrollmentParams) error
+	DeleteExam(ctx context.Context, id uuid.UUID) error
 	DeleteExpense(ctx context.Context, id uuid.UUID) error
 	DeleteExpiredRefreshSessions(ctx context.Context) error
 	DeleteGroup(ctx context.Context, id uuid.UUID) error
@@ -120,6 +123,7 @@ type Querier interface {
 	GetAssignmentForStudent(ctx context.Context, arg GetAssignmentForStudentParams) (HomeworkAssignment, error)
 	GetBotConversation(ctx context.Context, telegramChatID int64) (BotConversation, error)
 	GetCourse(ctx context.Context, arg GetCourseParams) (Course, error)
+	GetExam(ctx context.Context, id uuid.UUID) (Exam, error)
 	GetGamification(ctx context.Context, id uuid.UUID) (GetGamificationRow, error)
 	GetGraceLessons(ctx context.Context, id uuid.UUID) (int32, error)
 	GetGroup(ctx context.Context, id uuid.UUID) (Group, error)
@@ -178,8 +182,10 @@ type Querier interface {
 	// Telegram-linked group member who hasn't submitted — the recipients of the deadline push.
 	ListDueHomeworkReminders(ctx context.Context) ([]ListDueHomeworkRemindersRow, error)
 	ListEnrollmentsByStudent(ctx context.Context, studentID uuid.UUID) ([]Enrollment, error)
+	ListExamResults(ctx context.Context, dollar_1 uuid.UUID) ([]ListExamResultsRow, error)
 	ListExpenses(ctx context.Context, arg ListExpensesParams) ([]Expense, error)
 	ListGroupAssignments(ctx context.Context, dollar_1 uuid.UUID) ([]ListGroupAssignmentsRow, error)
+	ListGroupExams(ctx context.Context, dollar_1 uuid.UUID) ([]ListGroupExamsRow, error)
 	ListGroups(ctx context.Context) ([]Group, error)
 	ListGroupsByTeacher(ctx context.Context, teacherID pgtype.UUID) ([]Group, error)
 	ListGroupsForStudent(ctx context.Context, studentID uuid.UUID) ([]Group, error)
@@ -206,6 +212,8 @@ type Querier interface {
 	ListStaffUsers(ctx context.Context) ([]User, error)
 	// A student's assignments across all their groups, with their own submission (if any).
 	ListStudentAssignments(ctx context.Context, dollar_1 uuid.UUID) ([]ListStudentAssignmentsRow, error)
+	// A student's own exam results with the exam meta (for the mini app).
+	ListStudentExamResults(ctx context.Context, dollar_1 uuid.UUID) ([]ListStudentExamResultsRow, error)
 	ListStudents(ctx context.Context) ([]Student, error)
 	ListStudentsByGroup(ctx context.Context, groupID pgtype.UUID) ([]Student, error)
 	ListStudentsInGroup(ctx context.Context, groupID uuid.UUID) ([]Student, error)
@@ -279,6 +287,7 @@ type Querier interface {
 	UpdateTeacher(ctx context.Context, arg UpdateTeacherParams) (User, error)
 	UpdateUserPassword(ctx context.Context, arg UpdateUserPasswordParams) error
 	UpdateUserProfile(ctx context.Context, arg UpdateUserProfileParams) (User, error)
+	UpsertExamResult(ctx context.Context, arg UpsertExamResultParams) (ExamResult, error)
 	UpsertSalaryRule(ctx context.Context, arg UpsertSalaryRuleParams) (SalaryRule, error)
 	// Student submits (or re-submits) — grading resets to 'submitted'.
 	UpsertSubmission(ctx context.Context, arg UpsertSubmissionParams) (HomeworkSubmission, error)

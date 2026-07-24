@@ -1037,3 +1037,36 @@ SELECT
   coalesce(avg(EXTRACT(EPOCH FROM (resolved_at - created_at)) / 86400.0)
            FILTER (WHERE status = 'Resolved' AND resolved_at IS NOT NULL), 0)::float8              AS avg_resolve_days
 FROM intervention_tasks;
+
+-- --- exams + results (RLS-scoped) ---
+
+-- name: CreateExam :one
+INSERT INTO exams (org_id, group_id, title, exam_date, max_score)
+VALUES ($1, $2, $3, $4, $5) RETURNING *;
+
+-- name: ListGroupExams :many
+SELECT e.*, (SELECT count(*) FROM exam_results r WHERE r.exam_id = e.id)::bigint AS result_count
+FROM exams e WHERE e.group_id = $1::uuid ORDER BY e.exam_date DESC NULLS LAST, e.created_at DESC;
+
+-- name: GetExam :one
+SELECT * FROM exams WHERE id = $1;
+
+-- name: DeleteExam :exec
+DELETE FROM exams WHERE id = $1;
+
+-- name: UpsertExamResult :one
+INSERT INTO exam_results (org_id, exam_id, student_id, score)
+VALUES ($1, $2, $3, $4)
+ON CONFLICT (exam_id, student_id) DO UPDATE SET score = EXCLUDED.score, updated_at = now()
+RETURNING *;
+
+-- name: ListExamResults :many
+SELECT r.*, s.name AS student_name
+FROM exam_results r JOIN students s ON s.id = r.student_id
+WHERE r.exam_id = $1::uuid ORDER BY r.score DESC, s.name ASC;
+
+-- name: ListStudentExamResults :many
+-- A student's own exam results with the exam meta (for the mini app).
+SELECT r.score, e.id AS exam_id, e.title, e.exam_date, e.max_score
+FROM exam_results r JOIN exams e ON e.id = r.exam_id
+WHERE r.student_id = $1::uuid ORDER BY e.exam_date DESC NULLS LAST, e.created_at DESC;

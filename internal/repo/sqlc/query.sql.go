@@ -552,6 +552,42 @@ func (q *Queries) CreateEnrollment(ctx context.Context, arg CreateEnrollmentPara
 	return i, err
 }
 
+const createExam = `-- name: CreateExam :one
+
+INSERT INTO exams (org_id, group_id, title, exam_date, max_score)
+VALUES ($1, $2, $3, $4, $5) RETURNING id, org_id, group_id, title, exam_date, max_score, created_at
+`
+
+type CreateExamParams struct {
+	OrgID    uuid.UUID   `json:"org_id"`
+	GroupID  uuid.UUID   `json:"group_id"`
+	Title    string      `json:"title"`
+	ExamDate pgtype.Date `json:"exam_date"`
+	MaxScore int32       `json:"max_score"`
+}
+
+// --- exams + results (RLS-scoped) ---
+func (q *Queries) CreateExam(ctx context.Context, arg CreateExamParams) (Exam, error) {
+	row := q.db.QueryRow(ctx, createExam,
+		arg.OrgID,
+		arg.GroupID,
+		arg.Title,
+		arg.ExamDate,
+		arg.MaxScore,
+	)
+	var i Exam
+	err := row.Scan(
+		&i.ID,
+		&i.OrgID,
+		&i.GroupID,
+		&i.Title,
+		&i.ExamDate,
+		&i.MaxScore,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const createExpense = `-- name: CreateExpense :one
 INSERT INTO expenses (org_id, category, amount, spent_at, note)
 VALUES ($1, $2, $3, $4, $5)
@@ -1708,6 +1744,15 @@ func (q *Queries) DeleteEnrollment(ctx context.Context, arg DeleteEnrollmentPara
 	return err
 }
 
+const deleteExam = `-- name: DeleteExam :exec
+DELETE FROM exams WHERE id = $1
+`
+
+func (q *Queries) DeleteExam(ctx context.Context, id uuid.UUID) error {
+	_, err := q.db.Exec(ctx, deleteExam, id)
+	return err
+}
+
 const deleteExpense = `-- name: DeleteExpense :exec
 DELETE FROM expenses WHERE id = $1
 `
@@ -2073,6 +2118,25 @@ func (q *Queries) GetCourse(ctx context.Context, arg GetCourseParams) (Course, e
 		&i.DurationWeeks,
 		&i.Description,
 		&i.IsActive,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const getExam = `-- name: GetExam :one
+SELECT id, org_id, group_id, title, exam_date, max_score, created_at FROM exams WHERE id = $1
+`
+
+func (q *Queries) GetExam(ctx context.Context, id uuid.UUID) (Exam, error) {
+	row := q.db.QueryRow(ctx, getExam, id)
+	var i Exam
+	err := row.Scan(
+		&i.ID,
+		&i.OrgID,
+		&i.GroupID,
+		&i.Title,
+		&i.ExamDate,
+		&i.MaxScore,
 		&i.CreatedAt,
 	)
 	return i, err
@@ -3506,6 +3570,52 @@ func (q *Queries) ListEnrollmentsByStudent(ctx context.Context, studentID uuid.U
 	return items, nil
 }
 
+const listExamResults = `-- name: ListExamResults :many
+SELECT r.id, r.org_id, r.exam_id, r.student_id, r.score, r.created_at, r.updated_at, s.name AS student_name
+FROM exam_results r JOIN students s ON s.id = r.student_id
+WHERE r.exam_id = $1::uuid ORDER BY r.score DESC, s.name ASC
+`
+
+type ListExamResultsRow struct {
+	ID          uuid.UUID          `json:"id"`
+	OrgID       uuid.UUID          `json:"org_id"`
+	ExamID      uuid.UUID          `json:"exam_id"`
+	StudentID   uuid.UUID          `json:"student_id"`
+	Score       int32              `json:"score"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
+	StudentName string             `json:"student_name"`
+}
+
+func (q *Queries) ListExamResults(ctx context.Context, dollar_1 uuid.UUID) ([]ListExamResultsRow, error) {
+	rows, err := q.db.Query(ctx, listExamResults, dollar_1)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListExamResultsRow{}
+	for rows.Next() {
+		var i ListExamResultsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.OrgID,
+			&i.ExamID,
+			&i.StudentID,
+			&i.Score,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.StudentName,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listExpenses = `-- name: ListExpenses :many
 SELECT id, org_id, category, amount, spent_at, note, branch_id, created_at FROM expenses
 WHERE org_id = $1 AND spent_at >= $2 AND spent_at <= $3
@@ -3588,6 +3698,51 @@ func (q *Queries) ListGroupAssignments(ctx context.Context, dollar_1 uuid.UUID) 
 			&i.RemindedAt,
 			&i.CreatedAt,
 			&i.SubmissionCount,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listGroupExams = `-- name: ListGroupExams :many
+SELECT e.id, e.org_id, e.group_id, e.title, e.exam_date, e.max_score, e.created_at, (SELECT count(*) FROM exam_results r WHERE r.exam_id = e.id)::bigint AS result_count
+FROM exams e WHERE e.group_id = $1::uuid ORDER BY e.exam_date DESC NULLS LAST, e.created_at DESC
+`
+
+type ListGroupExamsRow struct {
+	ID          uuid.UUID          `json:"id"`
+	OrgID       uuid.UUID          `json:"org_id"`
+	GroupID     uuid.UUID          `json:"group_id"`
+	Title       string             `json:"title"`
+	ExamDate    pgtype.Date        `json:"exam_date"`
+	MaxScore    int32              `json:"max_score"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+	ResultCount int64              `json:"result_count"`
+}
+
+func (q *Queries) ListGroupExams(ctx context.Context, dollar_1 uuid.UUID) ([]ListGroupExamsRow, error) {
+	rows, err := q.db.Query(ctx, listGroupExams, dollar_1)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListGroupExamsRow{}
+	for rows.Next() {
+		var i ListGroupExamsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.OrgID,
+			&i.GroupID,
+			&i.Title,
+			&i.ExamDate,
+			&i.MaxScore,
+			&i.CreatedAt,
+			&i.ResultCount,
 		); err != nil {
 			return nil, err
 		}
@@ -4454,6 +4609,47 @@ func (q *Queries) ListStudentAssignments(ctx context.Context, dollar_1 uuid.UUID
 			&i.SubmissionLinks,
 			&i.ReviewNote,
 			&i.SubmittedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listStudentExamResults = `-- name: ListStudentExamResults :many
+SELECT r.score, e.id AS exam_id, e.title, e.exam_date, e.max_score
+FROM exam_results r JOIN exams e ON e.id = r.exam_id
+WHERE r.student_id = $1::uuid ORDER BY e.exam_date DESC NULLS LAST, e.created_at DESC
+`
+
+type ListStudentExamResultsRow struct {
+	Score    int32       `json:"score"`
+	ExamID   uuid.UUID   `json:"exam_id"`
+	Title    string      `json:"title"`
+	ExamDate pgtype.Date `json:"exam_date"`
+	MaxScore int32       `json:"max_score"`
+}
+
+// A student's own exam results with the exam meta (for the mini app).
+func (q *Queries) ListStudentExamResults(ctx context.Context, dollar_1 uuid.UUID) ([]ListStudentExamResultsRow, error) {
+	rows, err := q.db.Query(ctx, listStudentExamResults, dollar_1)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListStudentExamResultsRow{}
+	for rows.Next() {
+		var i ListStudentExamResultsRow
+		if err := rows.Scan(
+			&i.Score,
+			&i.ExamID,
+			&i.Title,
+			&i.ExamDate,
+			&i.MaxScore,
 		); err != nil {
 			return nil, err
 		}
@@ -6238,6 +6434,40 @@ func (q *Queries) UpdateUserProfile(ctx context.Context, arg UpdateUserProfilePa
 		&i.Phone,
 		&i.IsActive,
 		&i.BranchID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const upsertExamResult = `-- name: UpsertExamResult :one
+INSERT INTO exam_results (org_id, exam_id, student_id, score)
+VALUES ($1, $2, $3, $4)
+ON CONFLICT (exam_id, student_id) DO UPDATE SET score = EXCLUDED.score, updated_at = now()
+RETURNING id, org_id, exam_id, student_id, score, created_at, updated_at
+`
+
+type UpsertExamResultParams struct {
+	OrgID     uuid.UUID `json:"org_id"`
+	ExamID    uuid.UUID `json:"exam_id"`
+	StudentID uuid.UUID `json:"student_id"`
+	Score     int32     `json:"score"`
+}
+
+func (q *Queries) UpsertExamResult(ctx context.Context, arg UpsertExamResultParams) (ExamResult, error) {
+	row := q.db.QueryRow(ctx, upsertExamResult,
+		arg.OrgID,
+		arg.ExamID,
+		arg.StudentID,
+		arg.Score,
+	)
+	var i ExamResult
+	err := row.Scan(
+		&i.ID,
+		&i.OrgID,
+		&i.ExamID,
+		&i.StudentID,
+		&i.Score,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)

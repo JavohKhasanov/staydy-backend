@@ -302,6 +302,17 @@ type InterventionRepository interface {
 	Assign(ctx context.Context, orgID, id uuid.UUID, assignedTo *uuid.UUID) (entity.InterventionTask, error)
 }
 
+// ExamRepository persists exams + per-student results (RLS-scoped).
+type ExamRepository interface {
+	Create(ctx context.Context, orgID, groupID uuid.UUID, title string, date *time.Time, maxScore int) (entity.Exam, error)
+	ListGroupExams(ctx context.Context, orgID, groupID uuid.UUID) ([]entity.Exam, error)
+	GetExam(ctx context.Context, orgID, id uuid.UUID) (entity.Exam, error)
+	DeleteExam(ctx context.Context, orgID, id uuid.UUID) error
+	UpsertResult(ctx context.Context, orgID, examID, studentID uuid.UUID, score int) (entity.ExamResult, error)
+	ListResults(ctx context.Context, orgID, examID uuid.UUID) ([]entity.ExamResult, error)
+	StudentResults(ctx context.Context, orgID, studentID uuid.UUID) ([]entity.StudentExamResult, error)
+}
+
 // StaleTask is an unresolved intervention past its SLA (for the director escalation).
 type StaleTask struct {
 	ID          uuid.UUID

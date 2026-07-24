@@ -75,6 +75,17 @@ func (s *Service) AwardHomework(ctx context.Context, orgID, studentID, submissio
 	return err
 }
 
+// AwardExam grants XP for an exam result, idempotent per (student, exam) — a re-grade keeps the
+// first award (ref = exam id; the unique key also carries the student, so each student gets one).
+func (s *Service) AwardExam(ctx context.Context, orgID, studentID, examID uuid.UUID, xp int) error {
+	cfg := s.Config(ctx, orgID)
+	if xp < 0 {
+		xp = 0
+	}
+	_, err := s.repo.Award(ctx, orgID, studentID, entity.PointExam, xp, examID.String(), cfg)
+	return err
+}
+
 // AwardCheckin grants check-in XP once per calendar week.
 func (s *Service) AwardCheckin(ctx context.Context, orgID, studentID uuid.UUID, week int) error {
 	cfg := s.Config(ctx, orgID)

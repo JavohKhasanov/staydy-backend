@@ -118,7 +118,7 @@ func (s *Service) BroadcastWeeklySurvey(ctx context.Context) (int, error) {
 		return 0, err
 	}
 	for _, c := range chats {
-		s.startCheckin(ctx, c.ChatID)
+		s.send(ctx, c.ChatID, msgWeeklyReminder, openAppKeyboard())
 	}
 	return len(chats), nil
 }
@@ -164,26 +164,24 @@ func (s *Service) HandleUpdate(ctx context.Context, u telegram.Update) {
 	}
 }
 
+// handleMessage: the bot is a one-way notification channel. Everything the student does happens in
+// the Mini App, so /start greets + opens the app, and any other message just points back to it
+// (never silently ignored — a reply with the app button is clearer than silence).
 func (s *Service) handleMessage(ctx context.Context, m *telegram.Message) {
 	chatID := m.Chat.ID
-	text := strings.TrimSpace(m.Text)
+	if strings.HasPrefix(strings.TrimSpace(m.Text), "/start") {
+		s.send(ctx, chatID, msgStart, openAppKeyboard())
+		return
+	}
+	s.send(ctx, chatID, msgUseApp, openAppKeyboard())
+}
 
-	switch {
-	case strings.HasPrefix(text, "/start"):
-		arg := strings.TrimSpace(strings.TrimPrefix(text, "/start"))
-		if arg != "" {
-			s.linkChat(ctx, chatID, arg)
-		} else {
-			s.greet(ctx, chatID)
-		}
-	case text == "/checkin":
-		s.startCheckin(ctx, chatID)
-	case text == "/profil":
-		s.showProfile(ctx, chatID)
-	case text == "/help":
-		s.send(ctx, chatID, msgHelp, nil)
-	default:
-		s.handleFlowText(ctx, chatID, text)
+// openAppKeyboard is a single inline button that launches the student Mini App.
+func openAppKeyboard() *telegram.InlineKeyboardMarkup {
+	return &telegram.InlineKeyboardMarkup{
+		InlineKeyboard: [][]telegram.InlineKeyboardButton{{
+			{Text: "📱 Ilovani ochish", WebApp: &telegram.WebAppInfo{URL: miniAppURL}},
+		}},
 	}
 }
 
@@ -305,46 +303,14 @@ func zoneText(tier string) string {
 	}
 }
 
-// handleCallback handles inline-keyboard taps for the score/obstacle steps.
+// handleCallback acks any stale inline-button tap left over from older interactive messages and
+// points the student to the Mini App. The push-only bot sends no actionable buttons of its own.
 func (s *Service) handleCallback(ctx context.Context, cb *telegram.CallbackQuery) {
 	if cb.Message == nil {
 		return
 	}
-	chatID := cb.Message.Chat.ID
-	_ = s.tg.AnswerCallback(ctx, cb.ID, "") // stop the client spinner
-
-	conv, err := s.bots.GetConversation(ctx, chatID)
-	if err != nil || conv.Flow != flowCheckin {
-		s.send(ctx, chatID, msgUseCheckin, nil)
-		return
-	}
-
-	prefix, value, ok := strings.Cut(cb.Data, ":")
-	if !ok {
-		return
-	}
-	var d draft
-	_ = json.Unmarshal(conv.State, &d)
-
-	switch {
-	case conv.Step == stepMotiv && prefix == "m":
-		d.Motivation = atoiClamp(value, 1, 5)
-		s.advance(ctx, chatID, stepProgress, d, msgAskProgress, scoreKeyboard("p"))
-	case conv.Step == stepProgress && prefix == "p":
-		d.Progress = atoiClamp(value, 1, 5)
-		s.advance(ctx, chatID, stepObstacle, d, msgAskObstacle, obstacleKeyboard(s.obstaclesFor(ctx, conv.OrgID)))
-	case conv.Step == stepObstacle && prefix == "o":
-		opts := s.obstaclesFor(ctx, conv.OrgID)
-		idx := atoiClamp(value, 0, len(opts)-1)
-		d.Obstacle = opts[idx]
-		if err := s.bots.SetFlow(ctx, chatID, flowCheckin, stepComment, mustJSON(d)); err != nil {
-			s.fail(ctx, chatID, "set flow", err)
-			return
-		}
-		s.send(ctx, chatID, msgAskComment, nil)
-	default:
-		// Stale/duplicate tap for a step we've moved past — ignore quietly.
-	}
+	_ = s.tg.AnswerCallback(ctx, cb.ID, "")
+	s.send(ctx, cb.Message.Chat.ID, msgUseApp, openAppKeyboard())
 }
 
 func (s *Service) advance(ctx context.Context, chatID int64, nextStep string, d draft, prompt string, kb *telegram.InlineKeyboardMarkup) {

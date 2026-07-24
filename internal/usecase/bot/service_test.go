@@ -42,6 +42,7 @@ type fakeBots struct {
 	convos  map[int64]repo.BotConversation
 	used    map[string]bool
 	chatSet map[uuid.UUID]int64
+	linked  []repo.LinkedChat
 }
 
 func newFakeBots() *fakeBots {
@@ -84,7 +85,7 @@ func (f *fakeBots) SetStudentChat(_ context.Context, _, studentID uuid.UUID, cha
 	f.chatSet[studentID] = chatID
 	return nil
 }
-func (f *fakeBots) ListLinkedChats(context.Context) ([]repo.LinkedChat, error) { return nil, nil }
+func (f *fakeBots) ListLinkedChats(context.Context) ([]repo.LinkedChat, error) { return f.linked, nil }
 func (f *fakeBots) ListObstacleLabels(context.Context, uuid.UUID) ([]string, error) {
 	return nil, nil
 }
@@ -118,122 +119,63 @@ func cb(chatID int64, data string) telegram.Update {
 	return telegram.Update{CallbackQuery: &telegram.CallbackQuery{ID: "c", Data: data, Message: &telegram.Message{Chat: telegram.Chat{ID: chatID}}}}
 }
 
-// --- tests ---
+// --- tests (push-only bot) ---
 
-func TestStart_NoToken_NotLinked(t *testing.T) {
+func hasAppButton(kb *telegram.InlineKeyboardMarkup) bool {
+	if kb == nil {
+		return false
+	}
+	for _, row := range kb.InlineKeyboard {
+		for _, b := range row {
+			if b.WebApp != nil && b.WebApp.URL != "" {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func (f *fakeSender) lastKb() *telegram.InlineKeyboardMarkup {
+	if len(f.sent) == 0 {
+		return nil
+	}
+	return f.sent[len(f.sent)-1].kb
+}
+
+func TestStart_GreetsAndOpensApp(t *testing.T) {
 	svc, snd, _, _ := newTestSvc()
 	svc.HandleUpdate(context.Background(), msg(100, "/start"))
-	if !strings.Contains(snd.last(), "ulanmagansiz") {
-		t.Errorf("expected not-linked message, got %q", snd.last())
+	if !strings.Contains(snd.last(), "Staydy") || !hasAppButton(snd.lastKb()) {
+		t.Errorf("expected greeting + app button, got %q kb=%v", snd.last(), snd.lastKb())
 	}
 }
 
-func TestProfile_ShowsZoneAndName(t *testing.T) {
+func TestAnyMessage_PointsToApp(t *testing.T) {
+	svc, snd, _, _ := newTestSvc()
+	for _, text := range []string{"/checkin", "/profil", "salom", "random"} {
+		svc.HandleUpdate(context.Background(), msg(100, text))
+		if !strings.Contains(snd.last(), "ilovada") || !hasAppButton(snd.lastKb()) {
+			t.Errorf("%q: expected use-app nudge + button, got %q", text, snd.last())
+		}
+	}
+}
+
+func TestStaleCallback_AcksAndPointsToApp(t *testing.T) {
+	svc, snd, _, _ := newTestSvc()
+	svc.HandleUpdate(context.Background(), cb(100, "m:1")) // leftover score button
+	if !strings.Contains(snd.last(), "ilovada") || !hasAppButton(snd.lastKb()) {
+		t.Errorf("expected use-app nudge + button on stale callback, got %q", snd.last())
+	}
+}
+
+func TestWeeklyReminder_SendsToLinkedChats(t *testing.T) {
 	svc, snd, bots, _ := newTestSvc()
-	_ = bots.BindChat(context.Background(), 200, uuid.New(), uuid.New()) // link the chat
-	svc.HandleUpdate(context.Background(), msg(200, "/profil"))
-	out := snd.last()
-	if !strings.Contains(out, "Ali") || !strings.Contains(out, "zona") {
-		t.Errorf("expected profile with name + zone, got %q", out)
+	bots.linked = []repo.LinkedChat{{ChatID: 100}, {ChatID: 200}}
+	n, err := svc.BroadcastWeeklySurvey(context.Background())
+	if err != nil || n != 2 {
+		t.Fatalf("broadcast: n=%d err=%v, want 2/nil", n, err)
 	}
-}
-
-func TestProfile_NotLinked(t *testing.T) {
-	svc, snd, _, _ := newTestSvc()
-	svc.HandleUpdate(context.Background(), msg(201, "/profil"))
-	if !strings.Contains(snd.last(), "ulanmagansiz") {
-		t.Errorf("expected not-linked, got %q", snd.last())
-	}
-}
-
-func TestStart_BadToken(t *testing.T) {
-	svc, snd, _, _ := newTestSvc()
-	svc.HandleUpdate(context.Background(), msg(100, "/start nope"))
-	if !strings.Contains(snd.last(), "noto'g'ri") {
-		t.Errorf("expected bad-token message, got %q", snd.last())
-	}
-}
-
-func TestFullCheckinFlow_SubmitsSurvey(t *testing.T) {
-	svc, snd, bots, studs := newTestSvc()
-	ctx := context.Background()
-	orgID, studentID := uuid.New(), uuid.New()
-	_ = bots.CreateInvite(ctx, "tok", orgID, studentID, uuid.Nil, time.Now().Add(time.Hour))
-
-	// 1. link via deep link → binds chat, marks token used, sets student chat, then prompts motivation
-	svc.HandleUpdate(ctx, msg(100, "/start tok"))
-	if !bots.used["tok"] {
-		t.Fatal("token should be marked used")
-	}
-	if bots.chatSet[studentID] != 100 {
-		t.Fatal("student chat id should be bound")
-	}
-	if !strings.Contains(snd.last(), "motivatsiya") {
-		t.Fatalf("expected motivation prompt, got %q", snd.last())
-	}
-
-	// 2. walk the inline-keyboard FSM
-	svc.HandleUpdate(ctx, cb(100, "m:1"))
-	if !strings.Contains(snd.last(), "Progress") {
-		t.Fatalf("expected progress prompt, got %q", snd.last())
-	}
-	svc.HandleUpdate(ctx, cb(100, "p:2"))
-	if !strings.Contains(snd.last(), "to'sig'ingiz") {
-		t.Fatalf("expected obstacle prompt, got %q", snd.last())
-	}
-	svc.HandleUpdate(ctx, cb(100, "o:1")) // "Ish"
-	if !strings.Contains(snd.last(), "izoh") {
-		t.Fatalf("expected comment prompt, got %q", snd.last())
-	}
-
-	// 3. comment text finalizes → survey submitted with the accumulated answers
-	svc.HandleUpdate(ctx, msg(100, "yordam kerak"))
-	if studs.submitted == nil {
-		t.Fatal("survey should have been submitted")
-	}
-	got := studs.submitted
-	if got.motivation != 1 || got.progress != 2 || got.obstacle != "Ish" || got.comment != "yordam kerak" {
-		t.Errorf("submitted survey wrong: %+v", got)
-	}
-	if !strings.Contains(snd.last(), "qabul qilindi") {
-		t.Errorf("expected done message, got %q", snd.last())
-	}
-	// flow cleared
-	if c := bots.convos[100]; c.Flow != "" {
-		t.Errorf("flow should be cleared, got %q", c.Flow)
-	}
-}
-
-func TestSkipComment_SubmitsEmptyComment(t *testing.T) {
-	svc, _, bots, studs := newTestSvc()
-	ctx := context.Background()
-	orgID, studentID := uuid.New(), uuid.New()
-	_ = bots.CreateInvite(ctx, "tok", orgID, studentID, uuid.Nil, time.Now().Add(time.Hour))
-	svc.HandleUpdate(ctx, msg(100, "/start tok"))
-	svc.HandleUpdate(ctx, cb(100, "m:3"))
-	svc.HandleUpdate(ctx, cb(100, "p:3"))
-	svc.HandleUpdate(ctx, cb(100, "o:0"))
-	svc.HandleUpdate(ctx, msg(100, "/skip"))
-	if studs.submitted == nil || studs.submitted.comment != "" {
-		t.Errorf("expected empty comment on /skip, got %+v", studs.submitted)
-	}
-}
-
-func TestUsedToken_Rejected(t *testing.T) {
-	svc, snd, bots, _ := newTestSvc()
-	ctx := context.Background()
-	_ = bots.CreateInvite(ctx, "tok", uuid.New(), uuid.New(), uuid.Nil, time.Now().Add(time.Hour))
-	bots.used["tok"] = true
-	svc.HandleUpdate(ctx, msg(100, "/start tok"))
-	if !strings.Contains(snd.last(), "ishlatilgan") {
-		t.Errorf("expected used-token message, got %q", snd.last())
-	}
-}
-
-func TestCheckin_NotLinked_Rejected(t *testing.T) {
-	svc, snd, _, _ := newTestSvc()
-	svc.HandleUpdate(context.Background(), msg(100, "/checkin"))
-	if !strings.Contains(snd.last(), "ulanmagansiz") {
-		t.Errorf("expected not-linked message, got %q", snd.last())
+	if !strings.Contains(snd.last(), "check-in") || !hasAppButton(snd.lastKb()) {
+		t.Errorf("expected reminder + app button, got %q", snd.last())
 	}
 }

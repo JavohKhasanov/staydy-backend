@@ -68,9 +68,14 @@ type CallbackQuery struct {
 	Data    string   `json:"data"`
 }
 
+type WebAppInfo struct {
+	URL string `json:"url"`
+}
+
 type InlineKeyboardButton struct {
-	Text         string `json:"text"`
-	CallbackData string `json:"callback_data,omitempty"`
+	Text         string      `json:"text"`
+	CallbackData string      `json:"callback_data,omitempty"`
+	WebApp       *WebAppInfo `json:"web_app,omitempty"`
 }
 
 type InlineKeyboardMarkup struct {

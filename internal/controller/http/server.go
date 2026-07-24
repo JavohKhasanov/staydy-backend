@@ -27,6 +27,7 @@ import (
 	enrollmentusecase "github.com/student-success/backend/internal/usecase/enrollment"
 	financeusecase "github.com/student-success/backend/internal/usecase/finance"
 	analyticsusecase "github.com/student-success/backend/internal/usecase/analytics"
+	chatusecase "github.com/student-success/backend/internal/usecase/chat"
 	examusecase "github.com/student-success/backend/internal/usecase/exam"
 	interventionusecase "github.com/student-success/backend/internal/usecase/intervention"
 	notifyusecase "github.com/student-success/backend/internal/usecase/notify"
@@ -83,6 +84,7 @@ type Dependencies struct {
 	Notify        *notifyusecase.Service
 	Analytics     *analyticsusecase.Service
 	Exams         *examusecase.Service
+	Chat          *chatusecase.Service
 }
 
 type Server struct {
@@ -141,6 +143,7 @@ func NewServer(deps Dependencies) *Server {
 	registerStudentApp(studentAPI, deps.Students, deps.Points, deps.Logger)
 	registerStudentTelegramLink(studentAPI, deps.Bot, deps.Logger)
 	registerStudentExams(studentAPI, deps.Exams, deps.Logger)
+	registerStudentChat(studentAPI, deps.Chat, deps.Logger)
 	registerStudentHomework(studentAPI, deps.Homework, deps.Logger)
 	registerStudentShop(studentAPI, deps.Shop, deps.Points, deps.Logger)
 	registerStudentData(studentAPI, deps.Groups, deps.Finance, deps.Logger)

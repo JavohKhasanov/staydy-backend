@@ -15,6 +15,8 @@ import (
 var (
 	ErrNotFound      = errors.New("repo: not found")
 	ErrAlreadyExists = errors.New("repo: already exists")
+	// ErrConflict signals an operation refused by a state guard (e.g. deleting a paid salary slip).
+	ErrConflict = errors.New("repo: conflict")
 	// ErrSessionReused signals that an already-revoked refresh token was replayed — a
 	// breach indicator. RotateSession revokes the whole token family when it happens.
 	ErrSessionReused = errors.New("repo: refresh token reuse detected")

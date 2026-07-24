@@ -721,8 +721,9 @@ ORDER BY ss.created_at DESC;
 UPDATE salary_slips SET status = 'paid', paid_at = now()
 WHERE id = $1 AND status <> 'paid' RETURNING *;
 
--- name: DeleteSalarySlip :exec
-DELETE FROM salary_slips WHERE id = $1;
+-- name: DeleteSalarySlip :execrows
+-- Only draft slips may be deleted; a paid slip has a matching expense that would be orphaned.
+DELETE FROM salary_slips WHERE id = $1 AND status <> 'paid';
 
 -- name: CountTeacherDoneLessons :one
 SELECT COUNT(*)::bigint FROM lessons

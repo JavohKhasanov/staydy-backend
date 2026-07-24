@@ -11,6 +11,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/student-success/backend/internal/entity"
+	"github.com/student-success/backend/internal/repo"
 	salaryusecase "github.com/student-success/backend/internal/usecase/salary"
 )
 
@@ -337,6 +338,8 @@ func mapSalaryError(err error, log zerolog.Logger) error {
 		return huma.Error422UnprocessableEntity("ma'lumotlar noto'g'ri")
 	case errors.Is(err, salaryusecase.ErrNotFound):
 		return huma.Error404NotFound("topilmadi")
+	case errors.Is(err, repo.ErrConflict):
+		return huma.Error422UnprocessableEntity("to'langan maosh slipini o'chirib bo'lmaydi")
 	default:
 		log.Error().Err(err).Msg("salary op failed")
 		return huma.Error500InternalServerError("internal error")

@@ -235,6 +235,14 @@ func (r *SalaryRepository) MarkPaid(ctx context.Context, orgID, id uuid.UUID) (e
 
 func (r *SalaryRepository) DeleteSlip(ctx context.Context, orgID, id uuid.UUID) error {
 	return r.db.WithTenant(ctx, orgID.String(), func(tx pgx.Tx) error {
-		return sqlc.New(tx).DeleteSalarySlip(ctx, id)
+		rows, err := sqlc.New(tx).DeleteSalarySlip(ctx, id)
+		if err != nil {
+			return err
+		}
+		if rows == 0 {
+			// Missing, or a paid slip the query refuses to delete (its expense would orphan).
+			return repo.ErrConflict
+		}
+		return nil
 	})
 }

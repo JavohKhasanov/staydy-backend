@@ -17,7 +17,9 @@ BACKEND="$ROOT/staydy-backend"
 for repo in staydy-backend staydy-website staydy-app staydy-superadmin staydy-student; do
   if [ -d "$ROOT/$repo/.git" ]; then
     echo "==> git pull $repo"
-    git -C "$ROOT/$repo" pull --ff-only || echo "   (skipped — resolve $repo manually)"
+    # Abort the whole deploy on a failed pull — shipping stale/mixed-version code is worse than
+    # not deploying. Resolve the repo manually, then re-run.
+    git -C "$ROOT/$repo" pull --ff-only || { echo "!! pull failed for $repo — aborting deploy"; exit 1; }
   else
     echo "!! missing $ROOT/$repo — clone it as a sibling first"
   fi

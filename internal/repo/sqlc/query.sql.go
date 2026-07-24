@@ -1877,13 +1877,17 @@ func (q *Queries) DeleteRoom(ctx context.Context, id uuid.UUID) error {
 	return err
 }
 
-const deleteSalarySlip = `-- name: DeleteSalarySlip :exec
-DELETE FROM salary_slips WHERE id = $1
+const deleteSalarySlip = `-- name: DeleteSalarySlip :execrows
+DELETE FROM salary_slips WHERE id = $1 AND status <> 'paid'
 `
 
-func (q *Queries) DeleteSalarySlip(ctx context.Context, id uuid.UUID) error {
-	_, err := q.db.Exec(ctx, deleteSalarySlip, id)
-	return err
+// Only draft slips may be deleted; a paid slip has a matching expense that would be orphaned.
+func (q *Queries) DeleteSalarySlip(ctx context.Context, id uuid.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteSalarySlip, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const deleteShopItem = `-- name: DeleteShopItem :exec

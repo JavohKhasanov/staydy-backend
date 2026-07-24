@@ -106,7 +106,8 @@ type Querier interface {
 	DeletePayment(ctx context.Context, arg DeletePaymentParams) error
 	DeletePlan(ctx context.Context, id uuid.UUID) error
 	DeleteRoom(ctx context.Context, id uuid.UUID) error
-	DeleteSalarySlip(ctx context.Context, id uuid.UUID) error
+	// Only draft slips may be deleted; a paid slip has a matching expense that would be orphaned.
+	DeleteSalarySlip(ctx context.Context, id uuid.UUID) (int64, error)
 	DeleteShopItem(ctx context.Context, id uuid.UUID) error
 	DeleteStaffUser(ctx context.Context, id uuid.UUID) error
 	DeleteStudent(ctx context.Context, id uuid.UUID) error

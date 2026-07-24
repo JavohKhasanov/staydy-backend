@@ -171,6 +171,7 @@ type InterventionTask struct {
 	Status            string             `json:"status"`
 	ResolutionComment pgtype.Text        `json:"resolution_comment"`
 	AssignedTo        pgtype.UUID        `json:"assigned_to"`
+	EscalatedAt       pgtype.Timestamptz `json:"escalated_at"`
 	CreatedAt         pgtype.Timestamptz `json:"created_at"`
 	ResolvedAt        pgtype.Timestamptz `json:"resolved_at"`
 }
@@ -236,6 +237,18 @@ type Note struct {
 	StudentID uuid.UUID          `json:"student_id"`
 	Author    string             `json:"author"`
 	Text      string             `json:"text"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+}
+
+type Notification struct {
+	ID        uuid.UUID          `json:"id"`
+	OrgID     uuid.UUID          `json:"org_id"`
+	UserID    uuid.UUID          `json:"user_id"`
+	Kind      string             `json:"kind"`
+	Title     string             `json:"title"`
+	Body      string             `json:"body"`
+	Link      string             `json:"link"`
+	ReadAt    pgtype.Timestamptz `json:"read_at"`
 	CreatedAt pgtype.Timestamptz `json:"created_at"`
 }
 

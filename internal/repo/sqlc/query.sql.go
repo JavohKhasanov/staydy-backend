@@ -60,7 +60,7 @@ func (q *Queries) AdjustInvoicePaid(ctx context.Context, arg AdjustInvoicePaidPa
 }
 
 const assignInterventionTask = `-- name: AssignInterventionTask :one
-UPDATE intervention_tasks SET assigned_to = $2 WHERE id = $1 RETURNING id, org_id, student_id, reasons, status, resolution_comment, assigned_to, created_at, resolved_at
+UPDATE intervention_tasks SET assigned_to = $2 WHERE id = $1 RETURNING id, org_id, student_id, reasons, status, resolution_comment, assigned_to, escalated_at, created_at, resolved_at
 `
 
 type AssignInterventionTaskParams struct {
@@ -80,6 +80,7 @@ func (q *Queries) AssignInterventionTask(ctx context.Context, arg AssignInterven
 		&i.Status,
 		&i.ResolutionComment,
 		&i.AssignedTo,
+		&i.EscalatedAt,
 		&i.CreatedAt,
 		&i.ResolvedAt,
 	)
@@ -307,6 +308,17 @@ func (q *Queries) CountTeacherDoneLessons(ctx context.Context, arg CountTeacherD
 	var column_1 int64
 	err := row.Scan(&column_1)
 	return column_1, err
+}
+
+const countUnreadNotifications = `-- name: CountUnreadNotifications :one
+SELECT count(*) FROM notifications WHERE user_id = $1 AND read_at IS NULL
+`
+
+func (q *Queries) CountUnreadNotifications(ctx context.Context, userID uuid.UUID) (int64, error) {
+	row := q.db.QueryRow(ctx, countUnreadNotifications, userID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
 }
 
 const countUsersInOrg = `-- name: CountUsersInOrg :one
@@ -714,7 +726,7 @@ const createInterventionTask = `-- name: CreateInterventionTask :one
 INSERT INTO intervention_tasks (org_id, student_id, reasons, status)
 VALUES ($1, $2, $3, $4)
 ON CONFLICT (org_id, student_id) WHERE status <> 'Resolved' DO NOTHING
-RETURNING id, org_id, student_id, reasons, status, resolution_comment, assigned_to, created_at, resolved_at
+RETURNING id, org_id, student_id, reasons, status, resolution_comment, assigned_to, escalated_at, created_at, resolved_at
 `
 
 type CreateInterventionTaskParams struct {
@@ -743,6 +755,7 @@ func (q *Queries) CreateInterventionTask(ctx context.Context, arg CreateInterven
 		&i.Status,
 		&i.ResolutionComment,
 		&i.AssignedTo,
+		&i.EscalatedAt,
 		&i.CreatedAt,
 		&i.ResolvedAt,
 	)
@@ -958,6 +971,46 @@ func (q *Queries) CreateNote(ctx context.Context, arg CreateNoteParams) (Note, e
 		&i.StudentID,
 		&i.Author,
 		&i.Text,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const createNotification = `-- name: CreateNotification :one
+
+INSERT INTO notifications (org_id, user_id, kind, title, body, link)
+VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, org_id, user_id, kind, title, body, link, read_at, created_at
+`
+
+type CreateNotificationParams struct {
+	OrgID  uuid.UUID `json:"org_id"`
+	UserID uuid.UUID `json:"user_id"`
+	Kind   string    `json:"kind"`
+	Title  string    `json:"title"`
+	Body   string    `json:"body"`
+	Link   string    `json:"link"`
+}
+
+// --- notifications (in-app feed; RLS-scoped, additionally filtered by recipient user_id) ---
+func (q *Queries) CreateNotification(ctx context.Context, arg CreateNotificationParams) (Notification, error) {
+	row := q.db.QueryRow(ctx, createNotification,
+		arg.OrgID,
+		arg.UserID,
+		arg.Kind,
+		arg.Title,
+		arg.Body,
+		arg.Link,
+	)
+	var i Notification
+	err := row.Scan(
+		&i.ID,
+		&i.OrgID,
+		&i.UserID,
+		&i.Kind,
+		&i.Title,
+		&i.Body,
+		&i.Link,
+		&i.ReadAt,
 		&i.CreatedAt,
 	)
 	return i, err
@@ -2095,7 +2148,7 @@ func (q *Queries) GetGroup(ctx context.Context, id uuid.UUID) (Group, error) {
 }
 
 const getInterventionTask = `-- name: GetInterventionTask :one
-SELECT id, org_id, student_id, reasons, status, resolution_comment, assigned_to, created_at, resolved_at FROM intervention_tasks WHERE id = $1
+SELECT id, org_id, student_id, reasons, status, resolution_comment, assigned_to, escalated_at, created_at, resolved_at FROM intervention_tasks WHERE id = $1
 `
 
 func (q *Queries) GetInterventionTask(ctx context.Context, id uuid.UUID) (InterventionTask, error) {
@@ -2109,6 +2162,7 @@ func (q *Queries) GetInterventionTask(ctx context.Context, id uuid.UUID) (Interv
 		&i.Status,
 		&i.ResolutionComment,
 		&i.AssignedTo,
+		&i.EscalatedAt,
 		&i.CreatedAt,
 		&i.ResolvedAt,
 	)
@@ -3676,7 +3730,7 @@ func (q *Queries) ListHomeworkByStudent(ctx context.Context, studentID uuid.UUID
 }
 
 const listInterventionTasks = `-- name: ListInterventionTasks :many
-SELECT t.id, t.org_id, t.student_id, t.reasons, t.status, t.resolution_comment, t.assigned_to, t.created_at, t.resolved_at, s.name AS student_name, coalesce(u.full_name, '') AS assigned_to_name
+SELECT t.id, t.org_id, t.student_id, t.reasons, t.status, t.resolution_comment, t.assigned_to, t.escalated_at, t.created_at, t.resolved_at, s.name AS student_name, coalesce(u.full_name, '') AS assigned_to_name
 FROM intervention_tasks t
 JOIN students s ON s.id = t.student_id
 LEFT JOIN users u ON u.id = t.assigned_to
@@ -3691,6 +3745,7 @@ type ListInterventionTasksRow struct {
 	Status            string             `json:"status"`
 	ResolutionComment pgtype.Text        `json:"resolution_comment"`
 	AssignedTo        pgtype.UUID        `json:"assigned_to"`
+	EscalatedAt       pgtype.Timestamptz `json:"escalated_at"`
 	CreatedAt         pgtype.Timestamptz `json:"created_at"`
 	ResolvedAt        pgtype.Timestamptz `json:"resolved_at"`
 	StudentName       string             `json:"student_name"`
@@ -3714,6 +3769,7 @@ func (q *Queries) ListInterventionTasks(ctx context.Context) ([]ListIntervention
 			&i.Status,
 			&i.ResolutionComment,
 			&i.AssignedTo,
+			&i.EscalatedAt,
 			&i.CreatedAt,
 			&i.ResolvedAt,
 			&i.StudentName,
@@ -3912,6 +3968,40 @@ func (q *Queries) ListNotesByStudent(ctx context.Context, studentID uuid.UUID) (
 	return items, nil
 }
 
+const listNotifications = `-- name: ListNotifications :many
+SELECT id, org_id, user_id, kind, title, body, link, read_at, created_at FROM notifications WHERE user_id = $1 ORDER BY created_at DESC LIMIT 50
+`
+
+func (q *Queries) ListNotifications(ctx context.Context, userID uuid.UUID) ([]Notification, error) {
+	rows, err := q.db.Query(ctx, listNotifications, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Notification{}
+	for rows.Next() {
+		var i Notification
+		if err := rows.Scan(
+			&i.ID,
+			&i.OrgID,
+			&i.UserID,
+			&i.Kind,
+			&i.Title,
+			&i.Body,
+			&i.Link,
+			&i.ReadAt,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listObstacleOptions = `-- name: ListObstacleOptions :many
 SELECT id, org_id, label, position, is_active, created_at FROM obstacle_options
 WHERE org_id = $1 AND is_active = true
@@ -3938,6 +4028,31 @@ func (q *Queries) ListObstacleOptions(ctx context.Context, orgID uuid.UUID) ([]O
 			return nil, err
 		}
 		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listOrgDirectorIDs = `-- name: ListOrgDirectorIDs :many
+SELECT id FROM users WHERE role = 'center_admin'
+`
+
+// center_admin user ids of the current org (RLS-scoped), for escalation notifications.
+func (q *Queries) ListOrgDirectorIDs(ctx context.Context) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, listOrgDirectorIDs)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []uuid.UUID{}
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -4535,6 +4650,40 @@ func (q *Queries) ListSurveysByStudent(ctx context.Context, studentID uuid.UUID)
 	return items, nil
 }
 
+const listTasksForEscalation = `-- name: ListTasksForEscalation :many
+SELECT t.id, t.student_id, s.name AS student_name
+FROM intervention_tasks t
+JOIN students s ON s.id = t.student_id
+WHERE t.status <> 'Resolved' AND t.escalated_at IS NULL AND t.created_at <= $1
+`
+
+type ListTasksForEscalationRow struct {
+	ID          uuid.UUID `json:"id"`
+	StudentID   uuid.UUID `json:"student_id"`
+	StudentName string    `json:"student_name"`
+}
+
+// Unresolved tasks older than the cutoff and not yet escalated (SLA director alert).
+func (q *Queries) ListTasksForEscalation(ctx context.Context, createdAt pgtype.Timestamptz) ([]ListTasksForEscalationRow, error) {
+	rows, err := q.db.Query(ctx, listTasksForEscalation, createdAt)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListTasksForEscalationRow{}
+	for rows.Next() {
+		var i ListTasksForEscalationRow
+		if err := rows.Scan(&i.ID, &i.StudentID, &i.StudentName); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listUsers = `-- name: ListUsers :many
 SELECT id, org_id, email, password_hash, full_name, role, phone, is_active, branch_id, created_at, updated_at FROM users ORDER BY created_at ASC
 `
@@ -4628,6 +4777,15 @@ func (q *Queries) LockRefreshSessionByHash(ctx context.Context, tokenHash string
 	return i, err
 }
 
+const markAllNotificationsRead = `-- name: MarkAllNotificationsRead :exec
+UPDATE notifications SET read_at = now() WHERE user_id = $1 AND read_at IS NULL
+`
+
+func (q *Queries) MarkAllNotificationsRead(ctx context.Context, userID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, markAllNotificationsRead, userID)
+	return err
+}
+
 const markHomeworkReminded = `-- name: MarkHomeworkReminded :exec
 UPDATE homework_assignments SET reminded_at = now() WHERE id = $1
 `
@@ -4663,6 +4821,20 @@ func (q *Queries) MarkLeadConverted(ctx context.Context, arg MarkLeadConvertedPa
 	return err
 }
 
+const markNotificationRead = `-- name: MarkNotificationRead :exec
+UPDATE notifications SET read_at = now() WHERE id = $1 AND user_id = $2 AND read_at IS NULL
+`
+
+type MarkNotificationReadParams struct {
+	ID     uuid.UUID `json:"id"`
+	UserID uuid.UUID `json:"user_id"`
+}
+
+func (q *Queries) MarkNotificationRead(ctx context.Context, arg MarkNotificationReadParams) error {
+	_, err := q.db.Exec(ctx, markNotificationRead, arg.ID, arg.UserID)
+	return err
+}
+
 const markSalarySlipPaid = `-- name: MarkSalarySlipPaid :one
 UPDATE salary_slips SET status = 'paid', paid_at = now()
 WHERE id = $1 AND status <> 'paid' RETURNING id, org_id, teacher_id, period_start, period_end, gross, bonus, deduction, net, status, note, paid_at, created_at
@@ -4687,6 +4859,15 @@ func (q *Queries) MarkSalarySlipPaid(ctx context.Context, id uuid.UUID) (SalaryS
 		&i.CreatedAt,
 	)
 	return i, err
+}
+
+const markTaskEscalated = `-- name: MarkTaskEscalated :exec
+UPDATE intervention_tasks SET escalated_at = now() WHERE id = $1
+`
+
+func (q *Queries) MarkTaskEscalated(ctx context.Context, id uuid.UUID) error {
+	_, err := q.db.Exec(ctx, markTaskEscalated, id)
+	return err
 }
 
 const nullGroupForStudents = `-- name: NullGroupForStudents :exec
@@ -4772,7 +4953,7 @@ const resolveInterventionTask = `-- name: ResolveInterventionTask :one
 UPDATE intervention_tasks
 SET status = 'Resolved', resolution_comment = $2, resolved_at = now()
 WHERE id = $1 AND status <> 'Resolved'
-RETURNING id, org_id, student_id, reasons, status, resolution_comment, assigned_to, created_at, resolved_at
+RETURNING id, org_id, student_id, reasons, status, resolution_comment, assigned_to, escalated_at, created_at, resolved_at
 `
 
 type ResolveInterventionTaskParams struct {
@@ -4791,6 +4972,7 @@ func (q *Queries) ResolveInterventionTask(ctx context.Context, arg ResolveInterv
 		&i.Status,
 		&i.ResolutionComment,
 		&i.AssignedTo,
+		&i.EscalatedAt,
 		&i.CreatedAt,
 		&i.ResolvedAt,
 	)
@@ -5011,7 +5193,7 @@ const startInterventionTask = `-- name: StartInterventionTask :one
 UPDATE intervention_tasks
 SET status = 'In Progress'
 WHERE id = $1 AND status = 'Open'
-RETURNING id, org_id, student_id, reasons, status, resolution_comment, assigned_to, created_at, resolved_at
+RETURNING id, org_id, student_id, reasons, status, resolution_comment, assigned_to, escalated_at, created_at, resolved_at
 `
 
 func (q *Queries) StartInterventionTask(ctx context.Context, id uuid.UUID) (InterventionTask, error) {
@@ -5025,6 +5207,7 @@ func (q *Queries) StartInterventionTask(ctx context.Context, id uuid.UUID) (Inte
 		&i.Status,
 		&i.ResolutionComment,
 		&i.AssignedTo,
+		&i.EscalatedAt,
 		&i.CreatedAt,
 		&i.ResolvedAt,
 	)

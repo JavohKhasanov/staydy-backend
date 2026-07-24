@@ -302,6 +302,25 @@ type InterventionRepository interface {
 	Assign(ctx context.Context, orgID, id uuid.UUID, assignedTo *uuid.UUID) (entity.InterventionTask, error)
 }
 
+// StaleTask is an unresolved intervention past its SLA (for the director escalation).
+type StaleTask struct {
+	ID          uuid.UUID
+	StudentID   uuid.UUID
+	StudentName string
+}
+
+// NotificationRepository backs the in-app notification feed + the SLA escalation scan.
+type NotificationRepository interface {
+	Create(ctx context.Context, orgID, userID uuid.UUID, kind, title, body, link string) (entity.Notification, error)
+	List(ctx context.Context, orgID, userID uuid.UUID) ([]entity.Notification, error)
+	CountUnread(ctx context.Context, orgID, userID uuid.UUID) (int, error)
+	MarkRead(ctx context.Context, orgID, id, userID uuid.UUID) error
+	MarkAllRead(ctx context.Context, orgID, userID uuid.UUID) error
+	StaleTasks(ctx context.Context, orgID uuid.UUID, cutoff time.Time) ([]StaleTask, error)
+	MarkTaskEscalated(ctx context.Context, orgID, taskID uuid.UUID) error
+	DirectorIDs(ctx context.Context, orgID uuid.UUID) ([]uuid.UUID, error)
+}
+
 // RiskOutcome is the persisted result of recomputing a student's risk inside the
 // retention transaction.
 type RiskOutcome struct {

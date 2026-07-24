@@ -27,6 +27,7 @@ import (
 	enrollmentusecase "github.com/student-success/backend/internal/usecase/enrollment"
 	financeusecase "github.com/student-success/backend/internal/usecase/finance"
 	interventionusecase "github.com/student-success/backend/internal/usecase/intervention"
+	notifyusecase "github.com/student-success/backend/internal/usecase/notify"
 	leadusecase "github.com/student-success/backend/internal/usecase/lead"
 	lessonusecase "github.com/student-success/backend/internal/usecase/lesson"
 	branchusecase "github.com/student-success/backend/internal/usecase/branch"
@@ -77,6 +78,7 @@ type Dependencies struct {
 	Salary        *salaryusecase.Service
 	Branches      *branchusecase.Service
 	Rooms         *roomusecase.Service
+	Notify        *notifyusecase.Service
 }
 
 type Server struct {
@@ -148,7 +150,8 @@ func NewServer(deps Dependencies) *Server {
 	registerManualXP(teachingAPI, deps.Points, deps.Groups, deps.Logger)
 	registerStudentCredentials(teachingAPI, deps.Students, deps.Groups, deps.Logger)
 	registerStudents(protectedAPI, deps.Students, deps.Logger)
-	registerInterventions(protectedAPI, deps.Interventions, deps.Logger)
+	registerInterventions(protectedAPI, deps.Interventions, deps.Notify, deps.Logger)
+	registerNotifications(protectedAPI, deps.Notify, deps.Logger)
 	registerDashboard(protectedAPI, deps.Dashboard, deps.Logger)
 	registerAdvice(protectedAPI, deps.Students, deps.Advice, deps.Logger)
 	registerAccount(protectedAPI, deps.Auth, deps.Logger) // self-service change-password (any role)

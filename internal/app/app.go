@@ -31,6 +31,7 @@ import (
 	leadusecase "github.com/student-success/backend/internal/usecase/lead"
 	lessonusecase "github.com/student-success/backend/internal/usecase/lesson"
 	interventionusecase "github.com/student-success/backend/internal/usecase/intervention"
+	notifyusecase "github.com/student-success/backend/internal/usecase/notify"
 	branchusecase "github.com/student-success/backend/internal/usecase/branch"
 	obstacleusecase "github.com/student-success/backend/internal/usecase/obstacle"
 	planusecase "github.com/student-success/backend/internal/usecase/plan"
@@ -82,6 +83,7 @@ func New(ctx context.Context, cfg *config.Config) (*Application, error) {
 	attendanceRepo := repopg.NewAttendanceRepository(db)
 	homeworkRepo := repopg.NewHomeworkRepository(db)
 	interventionRepo := repopg.NewInterventionRepository(db)
+	notificationRepo := repopg.NewNotificationRepository(db)
 	retentionRepo := repopg.NewRetentionRepository(db)
 	dashboardRepo := repopg.NewDashboardRepository(db)
 	groupRepo := repopg.NewGroupRepository(db)
@@ -110,6 +112,7 @@ func New(ctx context.Context, cfg *config.Config) (*Application, error) {
 	authService := authusecase.NewService(authRepo, sessionRepo, tokenManager)
 	studentService := studentusecase.NewService(studentRepo, surveyRepo, attendanceRepo, homeworkRepo, retentionRepo)
 	interventionService := interventionusecase.NewService(interventionRepo)
+	notifyService := notifyusecase.NewService(notificationRepo, log)
 	groupService := groupusecase.NewService(groupRepo, teacherRepo, studentRepo)
 	teacherService := teacherusecase.NewService(teacherRepo)
 	staffService := staffusecase.NewService(staffRepo)
@@ -130,7 +133,7 @@ func New(ctx context.Context, cfg *config.Config) (*Application, error) {
 	dashboardService := dashboardusecase.NewService(dashboardRepo)
 	adviceService := adviceusecase.NewService(geminiClient)
 	botService := botusecase.NewService(telegramClient, botRepo, studentService, botUsername, cfg.Telegram.BotToken, log)
-	maintenanceService := maintenanceusecase.NewService(authRepo, studentService, botService, log)
+	maintenanceService := maintenanceusecase.NewService(authRepo, studentService, botService, notifyService, log)
 	superadminService := superadminusecase.NewService(repopg.NewSuperadminRepository(db), authRepo)
 	signupService := signupusecase.NewService(repopg.NewSignupRepository(db))
 	planService := planusecase.NewService(repopg.NewPlanRepository(db))
@@ -172,6 +175,7 @@ func New(ctx context.Context, cfg *config.Config) (*Application, error) {
 		Salary:        salaryService,
 		Branches:      branchService,
 		Rooms:         roomService,
+		Notify:        notifyService,
 	})
 
 	return &Application{log: log, db: db, server: server, sessions: sessionRepo, telegram: telegramClient, bot: botService, maintenance: maintenanceService}, nil

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -13,6 +14,7 @@ import (
 	"github.com/student-success/backend/internal/entity"
 	"github.com/student-success/backend/internal/i18n"
 	interventionusecase "github.com/student-success/backend/internal/usecase/intervention"
+	notifyusecase "github.com/student-success/backend/internal/usecase/notify"
 )
 
 type taskResponse struct {
@@ -53,7 +55,7 @@ type resolveTaskInput struct {
 type taskOutput struct{ Body taskResponse }
 
 // registerInterventions mounts the tenant-scoped intervention-task operations.
-func registerInterventions(api huma.API, svc *interventionusecase.Service, log zerolog.Logger) {
+func registerInterventions(api huma.API, svc *interventionusecase.Service, notify *notifyusecase.Service, log zerolog.Logger) {
 	Register(api, BearerOperation(huma.Operation{
 		OperationID: "intervention-tasks-list",
 		Method:      http.MethodGet,
@@ -150,6 +152,13 @@ func registerInterventions(api huma.API, svc *interventionusecase.Service, log z
 		task, err := svc.Assign(ctx, p.OrgID, id, assignee)
 		if err != nil {
 			return nil, mapInterventionError(LangFromContext(ctx), err, log)
+		}
+		// Let the newly-assigned staff member know, in-app.
+		if assignee != nil {
+			notify.Notify(ctx, p.OrgID, *assignee, entity.NotifyTaskAssigned,
+				"Sizga xavfli talaba biriktirildi",
+				strings.Join(task.Reasons, ", "),
+				"/students/"+task.StudentID.String())
 		}
 		return &taskOutput{Body: toTaskResponse(task)}, nil
 	})

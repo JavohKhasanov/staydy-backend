@@ -35,6 +35,7 @@ type Querier interface {
 	CountStudentsInOrg(ctx context.Context) (int64, error)
 	CountTeacherActiveStudents(ctx context.Context, dollar_1 uuid.UUID) (int64, error)
 	CountTeacherDoneLessons(ctx context.Context, arg CountTeacherDoneLessonsParams) (int64, error)
+	CountUnreadNotifications(ctx context.Context, userID uuid.UUID) (int64, error)
 	// RLS-scoped: run inside WithTenant(org).
 	CountUsersInOrg(ctx context.Context) (int64, error)
 	CreateActivity(ctx context.Context, arg CreateActivityParams) (Activity, error)
@@ -60,6 +61,8 @@ type Querier interface {
 	CreateLead(ctx context.Context, arg CreateLeadParams) (Lead, error)
 	CreateLesson(ctx context.Context, arg CreateLessonParams) (Lesson, error)
 	CreateNote(ctx context.Context, arg CreateNoteParams) (Note, error)
+	// --- notifications (in-app feed; RLS-scoped, additionally filtered by recipient user_id) ---
+	CreateNotification(ctx context.Context, arg CreateNotificationParams) (Notification, error)
 	CreateObstacleOption(ctx context.Context, arg CreateObstacleOptionParams) (ObstacleOption, error)
 	// sqlc queries. Run `make sqlc` to regenerate internal/repo/sqlc.
 	//
@@ -187,7 +190,10 @@ type Querier interface {
 	// NON-RLS: every chat bound to a student (for the weekly survey broadcast).
 	ListLinkedChats(ctx context.Context) ([]ListLinkedChatsRow, error)
 	ListNotesByStudent(ctx context.Context, studentID uuid.UUID) ([]Note, error)
+	ListNotifications(ctx context.Context, userID uuid.UUID) ([]Notification, error)
 	ListObstacleOptions(ctx context.Context, orgID uuid.UUID) ([]ObstacleOption, error)
+	// center_admin user ids of the current org (RLS-scoped), for escalation notifications.
+	ListOrgDirectorIDs(ctx context.Context) ([]uuid.UUID, error)
 	ListPaymentsByStudent(ctx context.Context, studentID uuid.UUID) ([]Payment, error)
 	ListRooms(ctx context.Context, orgID uuid.UUID) ([]Room, error)
 	ListSalaryGroupRules(ctx context.Context, dollar_1 uuid.UUID) ([]SalaryGroupRule, error)
@@ -203,15 +209,20 @@ type Querier interface {
 	ListStudentsByGroup(ctx context.Context, groupID pgtype.UUID) ([]Student, error)
 	ListStudentsInGroup(ctx context.Context, groupID uuid.UUID) ([]Student, error)
 	ListSurveysByStudent(ctx context.Context, studentID uuid.UUID) ([]Survey, error)
+	// Unresolved tasks older than the cutoff and not yet escalated (SLA director alert).
+	ListTasksForEscalation(ctx context.Context, createdAt pgtype.Timestamptz) ([]ListTasksForEscalationRow, error)
 	ListUsers(ctx context.Context) ([]User, error)
 	ListUsersByRole(ctx context.Context, role string) ([]User, error)
 	LockRefreshSessionByHash(ctx context.Context, tokenHash string) (RefreshSession, error)
+	MarkAllNotificationsRead(ctx context.Context, userID uuid.UUID) error
 	// Mark one assignment reminded (only those we actually pushed, so a just-entered assignment is
 	// never marked without being reminded).
 	MarkHomeworkReminded(ctx context.Context, id uuid.UUID) error
 	MarkInviteTokenUsed(ctx context.Context, token string) error
 	MarkLeadConverted(ctx context.Context, arg MarkLeadConvertedParams) error
+	MarkNotificationRead(ctx context.Context, arg MarkNotificationReadParams) error
 	MarkSalarySlipPaid(ctx context.Context, id uuid.UUID) (SalarySlip, error)
+	MarkTaskEscalated(ctx context.Context, id uuid.UUID) error
 	NullGroupForStudents(ctx context.Context, groupID pgtype.UUID) error
 	// Unpaid invoices past their due date (payment reminders).
 	OverdueInvoices(ctx context.Context) ([]OverdueInvoicesRow, error)

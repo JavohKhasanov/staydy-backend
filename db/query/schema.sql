@@ -543,11 +543,26 @@ CREATE TABLE intervention_tasks (
     status             text NOT NULL DEFAULT 'Open',
     resolution_comment text,
     assigned_to        uuid REFERENCES users(id) ON DELETE SET NULL,
+    escalated_at       timestamptz,
     created_at         timestamptz NOT NULL DEFAULT now(),
     resolved_at        timestamptz,
     FOREIGN KEY (org_id, student_id) REFERENCES students (org_id, id) ON DELETE CASCADE
 );
 CREATE INDEX idx_tasks_org_status ON intervention_tasks(org_id, status);
+
+-- In-app notification feed for back-office users.
+CREATE TABLE notifications (
+    id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    org_id     uuid NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    user_id    uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    kind       text NOT NULL,
+    title      text NOT NULL,
+    body       text NOT NULL DEFAULT '',
+    link       text NOT NULL DEFAULT '',
+    read_at    timestamptz,
+    created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_notifications_user ON notifications(org_id, user_id, created_at DESC);
 -- At most one non-resolved intervention task per student (DB-enforced auto-open dedup).
 CREATE UNIQUE INDEX intervention_tasks_one_open
     ON intervention_tasks (org_id, student_id) WHERE status <> 'Resolved';

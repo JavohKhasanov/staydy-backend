@@ -885,6 +885,38 @@ SELECT * FROM intervention_tasks WHERE id = $1;
 -- Assign (or clear, with NULL) the staff member responsible for a task.
 UPDATE intervention_tasks SET assigned_to = $2 WHERE id = $1 RETURNING *;
 
+-- name: ListTasksForEscalation :many
+-- Unresolved tasks older than the cutoff and not yet escalated (SLA director alert).
+SELECT t.id, t.student_id, s.name AS student_name
+FROM intervention_tasks t
+JOIN students s ON s.id = t.student_id
+WHERE t.status <> 'Resolved' AND t.escalated_at IS NULL AND t.created_at <= $1;
+
+-- name: MarkTaskEscalated :exec
+UPDATE intervention_tasks SET escalated_at = now() WHERE id = $1;
+
+-- name: ListOrgDirectorIDs :many
+-- center_admin user ids of the current org (RLS-scoped), for escalation notifications.
+SELECT id FROM users WHERE role = 'center_admin';
+
+-- --- notifications (in-app feed; RLS-scoped, additionally filtered by recipient user_id) ---
+
+-- name: CreateNotification :one
+INSERT INTO notifications (org_id, user_id, kind, title, body, link)
+VALUES ($1, $2, $3, $4, $5, $6) RETURNING *;
+
+-- name: ListNotifications :many
+SELECT * FROM notifications WHERE user_id = $1 ORDER BY created_at DESC LIMIT 50;
+
+-- name: CountUnreadNotifications :one
+SELECT count(*) FROM notifications WHERE user_id = $1 AND read_at IS NULL;
+
+-- name: MarkNotificationRead :exec
+UPDATE notifications SET read_at = now() WHERE id = $1 AND user_id = $2 AND read_at IS NULL;
+
+-- name: MarkAllNotificationsRead :exec
+UPDATE notifications SET read_at = now() WHERE user_id = $1 AND read_at IS NULL;
+
 -- name: StartInterventionTask :one
 UPDATE intervention_tasks
 SET status = 'In Progress'

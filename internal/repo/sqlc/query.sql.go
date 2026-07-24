@@ -2415,6 +2415,18 @@ func (q *Queries) GetStudentForApp(ctx context.Context, id uuid.UUID) (GetStuden
 	return i, err
 }
 
+const getStudentPasswordHash = `-- name: GetStudentPasswordHash :one
+SELECT coalesce(password_hash, '') FROM students WHERE id = $1
+`
+
+// Empty string when no password is set yet (so a verify simply fails instead of erroring on NULL).
+func (q *Queries) GetStudentPasswordHash(ctx context.Context, id uuid.UUID) (string, error) {
+	row := q.db.QueryRow(ctx, getStudentPasswordHash, id)
+	var password_hash string
+	err := row.Scan(&password_hash)
+	return password_hash, err
+}
+
 const getSubmissionGroup = `-- name: GetSubmissionGroup :one
 SELECT a.group_id FROM homework_submissions s
 JOIN homework_assignments a ON a.id = s.assignment_id

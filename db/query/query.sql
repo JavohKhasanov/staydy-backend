@@ -326,6 +326,10 @@ WHERE id = $1;
 -- name: SetStudentLoginPassword :exec
 UPDATE students SET password_hash = $2, updated_at = now() WHERE id = $1;
 
+-- name: GetStudentPasswordHash :one
+-- Empty string when no password is set yet (so a verify simply fails instead of erroring on NULL).
+SELECT coalesce(password_hash, '') FROM students WHERE id = $1;
+
 -- --- homework (assignments + submissions) ---
 
 -- name: CreateHomeworkAssignment :one

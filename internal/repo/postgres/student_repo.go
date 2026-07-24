@@ -150,6 +150,24 @@ func (r *StudentRepository) SetLoginPassword(ctx context.Context, orgID, id uuid
 	})
 }
 
+// GetPasswordHash returns a student's current password hash ("" when none is set), for verifying
+// the current password before a self-service change.
+func (r *StudentRepository) GetPasswordHash(ctx context.Context, orgID, id uuid.UUID) (string, error) {
+	var hash string
+	err := r.db.WithTenant(ctx, orgID.String(), func(tx pgx.Tx) error {
+		h, e := sqlc.New(tx).GetStudentPasswordHash(ctx, id)
+		if e != nil {
+			return e
+		}
+		hash = h
+		return nil
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", repo.ErrNotFound
+	}
+	return hash, err
+}
+
 // Profile returns the signed-in student's own profile (RLS-scoped by orgID from their token).
 func (r *StudentRepository) Profile(ctx context.Context, orgID, id uuid.UUID) (entity.StudentProfile, error) {
 	var p entity.StudentProfile

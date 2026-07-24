@@ -12,6 +12,7 @@ import (
 
 	"github.com/student-success/backend/internal/entity"
 	"github.com/student-success/backend/internal/i18n"
+	groupusecase "github.com/student-success/backend/internal/usecase/group"
 	studentusecase "github.com/student-success/backend/internal/usecase/student"
 )
 
@@ -205,10 +206,11 @@ type recordHomeworkInput struct {
 type homeworkOutput struct{ Body homeworkResponse }
 
 // registerStudents mounts the tenant-scoped student operations on the protected group.
-// registerStudentCredentials mounts the student mini-app password reset. Setting a student's
-// password lets the setter log in as that student, so it's management-only (director/administrator
-// via centerStaffAPI) — not every back-office role (teacher/mentor) like the rest of /students.
-func registerStudentCredentials(api huma.API, svc *studentusecase.Service, log zerolog.Logger) {
+// registerStudentCredentials mounts the student mini-app password reset (a student who forgot their
+// password). Setting it lets the setter sign in as that student, so it's restricted: a director or
+// administrator may reset any student's password; a teacher may reset only their own students'
+// (ownership-checked). Finance/mentor are excluded (not on teachingAPI).
+func registerStudentCredentials(api huma.API, svc *studentusecase.Service, groups *groupusecase.Service, log zerolog.Logger) {
 	Register(api, BearerOperation(huma.Operation{
 		OperationID: "students-set-login-password",
 		Method:      http.MethodPut,
@@ -224,6 +226,15 @@ func registerStudentCredentials(api huma.API, svc *studentusecase.Service, log z
 		id, err := uuid.Parse(in.ID)
 		if err != nil {
 			return nil, huma.Error422UnprocessableEntity("invalid student id")
+		}
+		if p.Role == entity.RoleTeacher {
+			owns, oerr := groups.OwnsStudent(ctx, p.OrgID, p.UserID, id)
+			if oerr != nil {
+				return nil, mapGroupError(LangFromContext(ctx), oerr, log)
+			}
+			if !owns {
+				return nil, huma.Error403Forbidden("student is not in your group")
+			}
 		}
 		if err := svc.SetLoginPassword(ctx, p.OrgID, id, in.Body.Password); err != nil {
 			return nil, mapStudentError(LangFromContext(ctx), err, log)

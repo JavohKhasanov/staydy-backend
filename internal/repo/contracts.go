@@ -132,6 +132,7 @@ type StudentRepository interface {
 	ListByGroup(ctx context.Context, orgID, groupID uuid.UUID) ([]entity.Student, error)
 	// Student mini-app: set a login password (admin), read the student's own profile (student token).
 	SetLoginPassword(ctx context.Context, orgID, id uuid.UUID, hash string) error
+	GetPasswordHash(ctx context.Context, orgID, id uuid.UUID) (string, error)
 	Profile(ctx context.Context, orgID, id uuid.UUID) (entity.StudentProfile, error)
 }
 

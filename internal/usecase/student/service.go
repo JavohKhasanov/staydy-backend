@@ -244,6 +244,29 @@ func (s *Service) SetLoginPassword(ctx context.Context, orgID, id uuid.UUID, pas
 	return s.students.SetLoginPassword(ctx, orgID, id, hash)
 }
 
+// ErrWrongPassword is returned when a student's current password doesn't match on a self-change.
+var ErrWrongPassword = errors.New("student: wrong current password")
+
+// ChangeLoginPassword lets an authenticated student change their own mini-app password after
+// proving the current one. Distinct from SetLoginPassword (an admin/teacher reset, no current pw).
+func (s *Service) ChangeLoginPassword(ctx context.Context, orgID, id uuid.UUID, current, next string) error {
+	if len(next) < 6 {
+		return ErrValidation
+	}
+	hash, err := s.students.GetPasswordHash(ctx, orgID, id)
+	if err != nil {
+		return err
+	}
+	if !security.CheckPassword(hash, current) {
+		return ErrWrongPassword
+	}
+	newHash, err := security.HashPassword(next)
+	if err != nil {
+		return err
+	}
+	return s.students.SetLoginPassword(ctx, orgID, id, newHash)
+}
+
 // Profile returns the signed-in student's own profile (for the mini app).
 func (s *Service) Profile(ctx context.Context, orgID, id uuid.UUID) (entity.StudentProfile, error) {
 	return s.students.Profile(ctx, orgID, id)

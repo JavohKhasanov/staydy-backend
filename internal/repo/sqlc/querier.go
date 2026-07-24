@@ -132,6 +132,8 @@ type Querier interface {
 	GetStudent(ctx context.Context, id uuid.UUID) (Student, error)
 	// The signed-in student's own profile + gamification (RLS-scoped; id comes from the student JWT).
 	GetStudentForApp(ctx context.Context, id uuid.UUID) (GetStudentForAppRow, error)
+	// Empty string when no password is set yet (so a verify simply fails instead of erroring on NULL).
+	GetStudentPasswordHash(ctx context.Context, id uuid.UUID) (string, error)
 	// The group a submission belongs to (via its assignment), for teacher ownership checks on grading.
 	GetSubmissionGroup(ctx context.Context, id uuid.UUID) (uuid.UUID, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)

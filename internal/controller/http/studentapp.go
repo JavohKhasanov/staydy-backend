@@ -86,6 +86,13 @@ type studentCheckinInput struct {
 
 // registerStudentApp mounts the signed-in student's own endpoints. Mount on a group gated to the
 // student role.
+type studentChangePasswordInput struct {
+	Body struct {
+		CurrentPassword string `json:"currentPassword" minLength:"1" maxLength:"128"`
+		NewPassword     string `json:"newPassword" minLength:"6" maxLength:"128"`
+	}
+}
+
 func registerStudentApp(api huma.API, svc *studentusecase.Service, points *pointsusecase.Service, log zerolog.Logger) {
 	Register(api, BearerOperation(huma.Operation{
 		OperationID:   "student-checkin",
@@ -137,5 +144,32 @@ func registerStudentApp(api huma.API, svc *studentusecase.Service, points *point
 		out.Body.XPIntoLevel = cfg.XPIntoLevel(prof.XP)
 		out.Body.XPPerLevel = cfg.LevelSize
 		return out, nil
+	})
+
+	Register(api, BearerOperation(huma.Operation{
+		OperationID:   "student-change-password",
+		Method:        http.MethodPut,
+		Path:          "/student/change-password",
+		Summary:       "Change your own mini-app password (requires the current one)",
+		Tags:          []string{"student"},
+		DefaultStatus: http.StatusNoContent,
+		Errors:        []int{http.StatusUnprocessableEntity, http.StatusUnauthorized, http.StatusInternalServerError},
+	}), func(ctx context.Context, in *studentChangePasswordInput) (*noContentOutput, error) {
+		p, err := principal(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if err := svc.ChangeLoginPassword(ctx, p.OrgID, p.UserID, in.Body.CurrentPassword, in.Body.NewPassword); err != nil {
+			switch {
+			case errors.Is(err, studentusecase.ErrValidation):
+				return nil, huma.Error422UnprocessableEntity("parol kamida 6 belgi bo'lishi kerak")
+			case errors.Is(err, studentusecase.ErrWrongPassword):
+				return nil, huma.Error422UnprocessableEntity("joriy parol noto'g'ri")
+			default:
+				log.Error().Err(err).Msg("student change password failed")
+				return nil, huma.Error500InternalServerError("internal error")
+			}
+		}
+		return &noContentOutput{}, nil
 	})
 }

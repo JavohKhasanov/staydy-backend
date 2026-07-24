@@ -51,6 +51,9 @@ func (f *fakeRepo) ListByGroup(context.Context, uuid.UUID, uuid.UUID) ([]entity.
 	return nil, nil
 }
 func (f *fakeRepo) SetLoginPassword(context.Context, uuid.UUID, uuid.UUID, string) error { return nil }
+func (f *fakeRepo) GetPasswordHash(context.Context, uuid.UUID, uuid.UUID) (string, error) {
+	return "", nil
+}
 func (f *fakeRepo) Profile(context.Context, uuid.UUID, uuid.UUID) (entity.StudentProfile, error) {
 	return entity.StudentProfile{}, nil
 }

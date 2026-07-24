@@ -49,11 +49,30 @@ type Service struct {
 	bots     repo.BotRepository
 	students StudentService
 	username string // bot @username, for building deep links
+	token    string // bot token, for verifying Mini App initData signatures
 	log      zerolog.Logger
 }
 
-func NewService(tg Sender, bots repo.BotRepository, students StudentService, username string, log zerolog.Logger) *Service {
-	return &Service{tg: tg, bots: bots, students: students, username: username, log: log}
+func NewService(tg Sender, bots repo.BotRepository, students StudentService, username, token string, log zerolog.Logger) *Service {
+	return &Service{tg: tg, bots: bots, students: students, username: username, token: token, log: log}
+}
+
+// LinkTelegram binds a signed-in student's Telegram to their record from Mini App initData, so the
+// bot may later push notifications to them. The initData signature is verified against the bot token
+// (proves the caller really is that Telegram user); the id doubles as the private-chat id.
+func (s *Service) LinkTelegram(ctx context.Context, orgID, studentID uuid.UUID, initData string) error {
+	tgID, err := telegram.VerifyInitData(initData, s.token)
+	if err != nil {
+		return err
+	}
+	if err := s.bots.SetStudentChat(ctx, orgID, studentID, tgID); err != nil {
+		return err
+	}
+	// Keep bot_users in sync so an inbound message resolves to the student too (best-effort).
+	if err := s.bots.BindChat(ctx, tgID, orgID, studentID); err != nil {
+		s.log.Warn().Err(err).Msg("bot: bind chat on telegram link")
+	}
+	return nil
 }
 
 // InviteLink is a deep link the admin shares with a student to connect their Telegram.

@@ -108,7 +108,7 @@ func (f *fakeStudents) SubmitWeeklySurvey(_ context.Context, _, _ uuid.UUID, m, 
 
 func newTestSvc() (*Service, *fakeSender, *fakeBots, *fakeStudents) {
 	snd, bots, studs := &fakeSender{}, newFakeBots(), &fakeStudents{name: "Ali"}
-	return NewService(snd, bots, studs, "testbot", zerolog.Nop()), snd, bots, studs
+	return NewService(snd, bots, studs, "testbot", "test-token", zerolog.Nop()), snd, bots, studs
 }
 
 func msg(chatID int64, text string) telegram.Update {

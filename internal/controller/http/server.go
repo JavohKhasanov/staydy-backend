@@ -133,6 +133,7 @@ func NewServer(deps Dependencies) *Server {
 	studentAPI.UseMiddleware(RequireAuth(api, deps.TokenManager))
 	studentAPI.UseMiddleware(RequireRole(api, entity.RoleStudent))
 	registerStudentApp(studentAPI, deps.Students, deps.Points, deps.Logger)
+	registerStudentTelegramLink(studentAPI, deps.Bot, deps.Logger)
 	registerStudentHomework(studentAPI, deps.Homework, deps.Logger)
 	registerStudentShop(studentAPI, deps.Shop, deps.Points, deps.Logger)
 	registerStudentData(studentAPI, deps.Groups, deps.Finance, deps.Logger)

@@ -129,7 +129,7 @@ func New(ctx context.Context, cfg *config.Config) (*Application, error) {
 	lessonService := lessonusecase.NewService(repopg.NewLessonRepository(db))
 	dashboardService := dashboardusecase.NewService(dashboardRepo)
 	adviceService := adviceusecase.NewService(geminiClient)
-	botService := botusecase.NewService(telegramClient, botRepo, studentService, botUsername, log)
+	botService := botusecase.NewService(telegramClient, botRepo, studentService, botUsername, cfg.Telegram.BotToken, log)
 	maintenanceService := maintenanceusecase.NewService(authRepo, studentService, botService, log)
 	superadminService := superadminusecase.NewService(repopg.NewSuperadminRepository(db), authRepo)
 	signupService := signupusecase.NewService(repopg.NewSignupRepository(db))

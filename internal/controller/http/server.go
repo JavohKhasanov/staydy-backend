@@ -151,7 +151,6 @@ func NewServer(deps Dependencies) *Server {
 	registerInterventions(protectedAPI, deps.Interventions, deps.Logger)
 	registerDashboard(protectedAPI, deps.Dashboard, deps.Logger)
 	registerAdvice(protectedAPI, deps.Students, deps.Advice, deps.Logger)
-	registerTelegram(protectedAPI, deps.Bot, deps.Logger)
 	registerAccount(protectedAPI, deps.Auth, deps.Logger) // self-service change-password (any role)
 
 	// Sensitive money — center profit/expense summary, the expense ledger, and teacher salaries.

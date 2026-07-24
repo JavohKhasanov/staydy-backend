@@ -20,9 +20,11 @@ type Recomputer interface {
 	RecomputeAll(ctx context.Context, orgID uuid.UUID) (int, error)
 }
 
-// Broadcaster pushes the weekly survey to every linked student.
+// Broadcaster pushes bot notifications: the weekly survey reminder (cross-tenant) and per-org
+// homework deadline reminders.
 type Broadcaster interface {
 	BroadcastWeeklySurvey(ctx context.Context) (int, error)
+	RemindDueHomework(ctx context.Context, orgID uuid.UUID) (int, error)
 }
 
 type Service struct {
@@ -53,6 +55,28 @@ func (s *Service) RecomputeAllTenants(ctx context.Context) (int, error) {
 		total += n
 	}
 	return total, nil
+}
+
+// RemindHomeworkAllTenants pushes homework-deadline reminders across every center. Runs frequently
+// (every ~20 min); dedupe lives in the query (only unreminded, in-window assignments).
+func (s *Service) RemindHomeworkAllTenants(ctx context.Context) {
+	orgIDs, err := s.orgs.AllOrgIDs(ctx)
+	if err != nil {
+		s.log.Error().Err(err).Msg("scheduler: homework reminder org list")
+		return
+	}
+	total := 0
+	for _, orgID := range orgIDs {
+		n, err := s.bot.RemindDueHomework(ctx, orgID)
+		if err != nil {
+			s.log.Error().Err(err).Str("org", orgID.String()).Msg("scheduler: homework reminder org")
+			continue
+		}
+		total += n
+	}
+	if total > 0 {
+		s.log.Info().Int("pushes", total).Msg("scheduler: homework deadline reminders sent")
+	}
 }
 
 // RunDaily recomputes every tenant (catches time-based trigger rules).

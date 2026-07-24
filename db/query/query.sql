@@ -341,6 +341,28 @@ VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *;
 UPDATE homework_assignments SET title = $2, description = $3, deadline = $4, max_score = $5
 WHERE id = $1 RETURNING *;
 
+-- name: ListDueHomeworkReminders :many
+-- Assignments whose deadline is within the next 2 hours and not yet reminded, paired with each
+-- Telegram-linked group member who hasn't submitted — the recipients of the deadline push.
+SELECT a.id AS assignment_id, a.title, a.deadline, s.telegram_chat_id
+FROM homework_assignments a
+JOIN group_members gm ON gm.group_id = a.group_id
+JOIN students s ON s.id = gm.student_id
+WHERE a.deadline IS NOT NULL
+  AND a.deadline > now()
+  AND a.deadline <= now() + interval '2 hours'
+  AND a.reminded_at IS NULL
+  AND s.telegram_chat_id IS NOT NULL
+  AND NOT EXISTS (
+    SELECT 1 FROM homework_submissions sub WHERE sub.assignment_id = a.id AND sub.student_id = s.id
+  )
+ORDER BY a.id;
+
+-- name: MarkHomeworkReminded :exec
+-- Mark one assignment reminded (only those we actually pushed, so a just-entered assignment is
+-- never marked without being reminded).
+UPDATE homework_assignments SET reminded_at = now() WHERE id = $1;
+
 -- name: ListGroupAssignments :many
 SELECT a.*,
   (SELECT count(*) FROM homework_submissions s WHERE s.assignment_id = a.id)::bigint AS submission_count

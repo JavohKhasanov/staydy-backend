@@ -123,6 +123,30 @@ func (s *Service) BroadcastWeeklySurvey(ctx context.Context) (int, error) {
 	return len(chats), nil
 }
 
+// RemindDueHomework pushes a "deadline soon" nudge to each linked student in one org who hasn't
+// submitted an assignment due within the next 2 hours, then marks those assignments reminded so
+// they aren't pinged again. Returns the number of pushes sent.
+func (s *Service) RemindDueHomework(ctx context.Context, orgID uuid.UUID) (int, error) {
+	if !s.tg.Configured() {
+		return 0, nil
+	}
+	reminders, err := s.bots.DueHomeworkReminders(ctx, orgID)
+	if err != nil {
+		return 0, err
+	}
+	marked := map[uuid.UUID]bool{}
+	for _, r := range reminders {
+		s.send(ctx, r.ChatID, fmt.Sprintf(msgHomeworkDeadline, r.Title), openAppKeyboard())
+		if !marked[r.AssignmentID] {
+			marked[r.AssignmentID] = true
+			if err := s.bots.MarkHomeworkReminded(ctx, orgID, r.AssignmentID); err != nil {
+				s.log.Warn().Err(err).Msg("bot: mark homework reminded")
+			}
+		}
+	}
+	return len(reminders), nil
+}
+
 func randomToken() (string, error) {
 	b := make([]byte, 18)
 	if _, err := rand.Read(b); err != nil {

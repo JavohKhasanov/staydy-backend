@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
+	"github.com/student-success/backend/internal/entity"
 	"github.com/student-success/backend/internal/platform/postgres"
 	"github.com/student-success/backend/internal/repo"
 	"github.com/student-success/backend/internal/repo/sqlc"
@@ -103,6 +104,36 @@ func (r *BotRepository) SetStudentChat(ctx context.Context, orgID, studentID uui
 			ID:             studentID,
 			TelegramChatID: pgInt8(chatID),
 		})
+	})
+}
+
+// DueHomeworkReminders returns the deadline-push recipients for one org (RLS-scoped): linked
+// students who haven't submitted an assignment whose deadline is within the next 2 hours.
+func (r *BotRepository) DueHomeworkReminders(ctx context.Context, orgID uuid.UUID) ([]entity.HomeworkReminder, error) {
+	var out []entity.HomeworkReminder
+	err := r.db.WithTenant(ctx, orgID.String(), func(tx pgx.Tx) error {
+		rows, e := sqlc.New(tx).ListDueHomeworkReminders(ctx)
+		if e != nil {
+			return e
+		}
+		out = make([]entity.HomeworkReminder, 0, len(rows))
+		for _, row := range rows {
+			out = append(out, entity.HomeworkReminder{
+				AssignmentID: row.AssignmentID,
+				Title:        row.Title,
+				Deadline:     row.Deadline.Time,
+				ChatID:       row.TelegramChatID.Int64,
+			})
+		}
+		return nil
+	})
+	return out, err
+}
+
+// MarkHomeworkReminded flags one assignment reminded so it isn't pinged again.
+func (r *BotRepository) MarkHomeworkReminded(ctx context.Context, orgID, assignmentID uuid.UUID) error {
+	return r.db.WithTenant(ctx, orgID.String(), func(tx pgx.Tx) error {
+		return sqlc.New(tx).MarkHomeworkReminded(ctx, assignmentID)
 	})
 }
 

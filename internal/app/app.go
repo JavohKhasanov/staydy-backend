@@ -186,6 +186,7 @@ func (a *Application) Run(ctx context.Context) error {
 	g.Go(func() error { return a.runSessionReaper(ctx) })
 	g.Go(func() error { return a.runBotPoller(ctx) })
 	g.Go(func() error { return a.runScheduler(ctx) })
+	g.Go(func() error { return a.runReminderScheduler(ctx) })
 	return g.Wait()
 }
 
@@ -250,6 +251,20 @@ func sleepCtx(ctx context.Context, d time.Duration) bool {
 
 // schedulerHour is the local hour-of-day the daily job runs (Monday also pushes the survey).
 const schedulerHour = 9
+
+// reminderInterval is how often the homework-deadline reminder scan runs (independent of the daily job).
+const reminderInterval = 20 * time.Minute
+
+// runReminderScheduler periodically pushes "deadline in 2h" homework reminders across all tenants.
+func (a *Application) runReminderScheduler(ctx context.Context) error {
+	a.log.Info().Dur("interval", reminderInterval).Msg("reminder scheduler started (homework deadlines)")
+	for {
+		if !sleepCtx(ctx, reminderInterval) {
+			return nil
+		}
+		a.maintenance.RemindHomeworkAllTenants(context.Background())
+	}
+}
 
 // runScheduler runs the daily maintenance job at schedulerHour; on Mondays it also broadcasts
 // the weekly check-in survey. It recomputes every tenant's risk so time-based trigger rules fire

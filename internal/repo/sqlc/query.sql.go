@@ -643,7 +643,7 @@ func (q *Queries) CreateHomework(ctx context.Context, arg CreateHomeworkParams) 
 const createHomeworkAssignment = `-- name: CreateHomeworkAssignment :one
 
 INSERT INTO homework_assignments (org_id, group_id, lesson_date, title, description, deadline, max_score)
-VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, org_id, group_id, lesson_date, title, description, deadline, max_score, created_at
+VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, org_id, group_id, lesson_date, title, description, deadline, max_score, reminded_at, created_at
 `
 
 type CreateHomeworkAssignmentParams struct {
@@ -677,6 +677,7 @@ func (q *Queries) CreateHomeworkAssignment(ctx context.Context, arg CreateHomewo
 		&i.Description,
 		&i.Deadline,
 		&i.MaxScore,
+		&i.RemindedAt,
 		&i.CreatedAt,
 	)
 	return i, err
@@ -1898,7 +1899,7 @@ func (q *Queries) GenerateMonthlyInvoices(ctx context.Context, period string) (i
 }
 
 const getAssignment = `-- name: GetAssignment :one
-SELECT id, org_id, group_id, lesson_date, title, description, deadline, max_score, created_at FROM homework_assignments WHERE id = $1
+SELECT id, org_id, group_id, lesson_date, title, description, deadline, max_score, reminded_at, created_at FROM homework_assignments WHERE id = $1
 `
 
 func (q *Queries) GetAssignment(ctx context.Context, id uuid.UUID) (HomeworkAssignment, error) {
@@ -1913,13 +1914,14 @@ func (q *Queries) GetAssignment(ctx context.Context, id uuid.UUID) (HomeworkAssi
 		&i.Description,
 		&i.Deadline,
 		&i.MaxScore,
+		&i.RemindedAt,
 		&i.CreatedAt,
 	)
 	return i, err
 }
 
 const getAssignmentForStudent = `-- name: GetAssignmentForStudent :one
-SELECT a.id, a.org_id, a.group_id, a.lesson_date, a.title, a.description, a.deadline, a.max_score, a.created_at FROM homework_assignments a
+SELECT a.id, a.org_id, a.group_id, a.lesson_date, a.title, a.description, a.deadline, a.max_score, a.reminded_at, a.created_at FROM homework_assignments a
 JOIN group_members m ON m.group_id = a.group_id AND m.student_id = $2::uuid
 WHERE a.id = $1
 `
@@ -1942,6 +1944,7 @@ func (q *Queries) GetAssignmentForStudent(ctx context.Context, arg GetAssignment
 		&i.Description,
 		&i.Deadline,
 		&i.MaxScore,
+		&i.RemindedAt,
 		&i.CreatedAt,
 	)
 	return i, err
@@ -3305,6 +3308,56 @@ func (q *Queries) ListDebtors(ctx context.Context, orgID uuid.UUID) ([]ListDebto
 	return items, nil
 }
 
+const listDueHomeworkReminders = `-- name: ListDueHomeworkReminders :many
+SELECT a.id AS assignment_id, a.title, a.deadline, s.telegram_chat_id
+FROM homework_assignments a
+JOIN group_members gm ON gm.group_id = a.group_id
+JOIN students s ON s.id = gm.student_id
+WHERE a.deadline IS NOT NULL
+  AND a.deadline > now()
+  AND a.deadline <= now() + interval '2 hours'
+  AND a.reminded_at IS NULL
+  AND s.telegram_chat_id IS NOT NULL
+  AND NOT EXISTS (
+    SELECT 1 FROM homework_submissions sub WHERE sub.assignment_id = a.id AND sub.student_id = s.id
+  )
+ORDER BY a.id
+`
+
+type ListDueHomeworkRemindersRow struct {
+	AssignmentID   uuid.UUID          `json:"assignment_id"`
+	Title          string             `json:"title"`
+	Deadline       pgtype.Timestamptz `json:"deadline"`
+	TelegramChatID pgtype.Int8        `json:"telegram_chat_id"`
+}
+
+// Assignments whose deadline is within the next 2 hours and not yet reminded, paired with each
+// Telegram-linked group member who hasn't submitted — the recipients of the deadline push.
+func (q *Queries) ListDueHomeworkReminders(ctx context.Context) ([]ListDueHomeworkRemindersRow, error) {
+	rows, err := q.db.Query(ctx, listDueHomeworkReminders)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListDueHomeworkRemindersRow{}
+	for rows.Next() {
+		var i ListDueHomeworkRemindersRow
+		if err := rows.Scan(
+			&i.AssignmentID,
+			&i.Title,
+			&i.Deadline,
+			&i.TelegramChatID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listEnrollmentsByStudent = `-- name: ListEnrollmentsByStudent :many
 SELECT id, org_id, student_id, group_id, course_id, status, start_date, end_date, price, discount, created_at FROM enrollments WHERE student_id = $1 ORDER BY created_at DESC
 `
@@ -3383,7 +3436,7 @@ func (q *Queries) ListExpenses(ctx context.Context, arg ListExpensesParams) ([]E
 }
 
 const listGroupAssignments = `-- name: ListGroupAssignments :many
-SELECT a.id, a.org_id, a.group_id, a.lesson_date, a.title, a.description, a.deadline, a.max_score, a.created_at,
+SELECT a.id, a.org_id, a.group_id, a.lesson_date, a.title, a.description, a.deadline, a.max_score, a.reminded_at, a.created_at,
   (SELECT count(*) FROM homework_submissions s WHERE s.assignment_id = a.id)::bigint AS submission_count
 FROM homework_assignments a WHERE a.group_id = $1::uuid ORDER BY a.created_at DESC
 `
@@ -3397,6 +3450,7 @@ type ListGroupAssignmentsRow struct {
 	Description     string             `json:"description"`
 	Deadline        pgtype.Timestamptz `json:"deadline"`
 	MaxScore        int32              `json:"max_score"`
+	RemindedAt      pgtype.Timestamptz `json:"reminded_at"`
 	CreatedAt       pgtype.Timestamptz `json:"created_at"`
 	SubmissionCount int64              `json:"submission_count"`
 }
@@ -3419,6 +3473,7 @@ func (q *Queries) ListGroupAssignments(ctx context.Context, dollar_1 uuid.UUID) 
 			&i.Description,
 			&i.Deadline,
 			&i.MaxScore,
+			&i.RemindedAt,
 			&i.CreatedAt,
 			&i.SubmissionCount,
 		); err != nil {
@@ -4539,6 +4594,17 @@ func (q *Queries) LockRefreshSessionByHash(ctx context.Context, tokenHash string
 	return i, err
 }
 
+const markHomeworkReminded = `-- name: MarkHomeworkReminded :exec
+UPDATE homework_assignments SET reminded_at = now() WHERE id = $1
+`
+
+// Mark one assignment reminded (only those we actually pushed, so a just-entered assignment is
+// never marked without being reminded).
+func (q *Queries) MarkHomeworkReminded(ctx context.Context, id uuid.UUID) error {
+	_, err := q.db.Exec(ctx, markHomeworkReminded, id)
+	return err
+}
+
 const markInviteTokenUsed = `-- name: MarkInviteTokenUsed :exec
 UPDATE invite_tokens SET used_at = now() WHERE token = $1
 `
@@ -5242,7 +5308,7 @@ func (q *Queries) UpdateGroup(ctx context.Context, arg UpdateGroupParams) (Group
 
 const updateHomeworkAssignment = `-- name: UpdateHomeworkAssignment :one
 UPDATE homework_assignments SET title = $2, description = $3, deadline = $4, max_score = $5
-WHERE id = $1 RETURNING id, org_id, group_id, lesson_date, title, description, deadline, max_score, created_at
+WHERE id = $1 RETURNING id, org_id, group_id, lesson_date, title, description, deadline, max_score, reminded_at, created_at
 `
 
 type UpdateHomeworkAssignmentParams struct {
@@ -5272,6 +5338,7 @@ func (q *Queries) UpdateHomeworkAssignment(ctx context.Context, arg UpdateHomewo
 		&i.Description,
 		&i.Deadline,
 		&i.MaxScore,
+		&i.RemindedAt,
 		&i.CreatedAt,
 	)
 	return i, err

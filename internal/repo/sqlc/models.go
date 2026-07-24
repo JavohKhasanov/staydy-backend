@@ -135,6 +135,7 @@ type HomeworkAssignment struct {
 	Description string             `json:"description"`
 	Deadline    pgtype.Timestamptz `json:"deadline"`
 	MaxScore    int32              `json:"max_score"`
+	RemindedAt  pgtype.Timestamptz `json:"reminded_at"`
 	CreatedAt   pgtype.Timestamptz `json:"created_at"`
 }
 

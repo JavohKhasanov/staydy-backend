@@ -168,6 +168,9 @@ type Querier interface {
 	ListBranches(ctx context.Context, orgID uuid.UUID) ([]Branch, error)
 	ListCourses(ctx context.Context, orgID uuid.UUID) ([]Course, error)
 	ListDebtors(ctx context.Context, orgID uuid.UUID) ([]ListDebtorsRow, error)
+	// Assignments whose deadline is within the next 2 hours and not yet reminded, paired with each
+	// Telegram-linked group member who hasn't submitted — the recipients of the deadline push.
+	ListDueHomeworkReminders(ctx context.Context) ([]ListDueHomeworkRemindersRow, error)
 	ListEnrollmentsByStudent(ctx context.Context, studentID uuid.UUID) ([]Enrollment, error)
 	ListExpenses(ctx context.Context, arg ListExpensesParams) ([]Expense, error)
 	ListGroupAssignments(ctx context.Context, dollar_1 uuid.UUID) ([]ListGroupAssignmentsRow, error)
@@ -201,6 +204,9 @@ type Querier interface {
 	ListUsers(ctx context.Context) ([]User, error)
 	ListUsersByRole(ctx context.Context, role string) ([]User, error)
 	LockRefreshSessionByHash(ctx context.Context, tokenHash string) (RefreshSession, error)
+	// Mark one assignment reminded (only those we actually pushed, so a just-entered assignment is
+	// never marked without being reminded).
+	MarkHomeworkReminded(ctx context.Context, id uuid.UUID) error
 	MarkInviteTokenUsed(ctx context.Context, token string) error
 	MarkLeadConverted(ctx context.Context, arg MarkLeadConvertedParams) error
 	MarkSalarySlipPaid(ctx context.Context, id uuid.UUID) (SalarySlip, error)

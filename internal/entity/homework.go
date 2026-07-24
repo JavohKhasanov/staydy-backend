@@ -33,6 +33,15 @@ type HomeworkAssignment struct {
 	SubmissionCount int64 // in the teacher list view
 }
 
+// HomeworkReminder is one "deadline soon" push target: a linked student who hasn't submitted a
+// specific assignment whose deadline is near.
+type HomeworkReminder struct {
+	AssignmentID uuid.UUID
+	Title        string
+	Deadline     time.Time
+	ChatID       int64
+}
+
 // HomeworkSubmission is one student's answer to an assignment (graded by the teacher).
 type HomeworkSubmission struct {
 	ID           uuid.UUID

@@ -12,6 +12,8 @@ const (
 		"Darslar, uy vazifalar, reyting va haftalik holat — hammasi ilovada. Quyidagi tugma bilan oching 👇"
 	msgUseApp = "Bu bot faqat eslatma yuboradi. 📲 Hamma amal ilovada — quyidagi tugma bilan oching."
 	msgWeeklyReminder = "🗓 Haftalik holatni belgilash vaqti keldi! Ilovaga kirib, check-in qiling. 💪"
+	// %s = assignment title
+	msgHomeworkDeadline = "⏰ *%s* — topshirish muddatiga *2 soat* qoldi!\nHali topshirmadingiz. Ilovaga kirib topshiring 👇"
 )
 
 const (

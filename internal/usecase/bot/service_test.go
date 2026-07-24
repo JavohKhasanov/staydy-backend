@@ -38,11 +38,13 @@ func (f *fakeSender) last() string {
 }
 
 type fakeBots struct {
-	invites map[string]repo.BotInvite
-	convos  map[int64]repo.BotConversation
-	used    map[string]bool
-	chatSet map[uuid.UUID]int64
-	linked  []repo.LinkedChat
+	invites   map[string]repo.BotInvite
+	convos    map[int64]repo.BotConversation
+	used      map[string]bool
+	chatSet   map[uuid.UUID]int64
+	linked    []repo.LinkedChat
+	reminders []entity.HomeworkReminder
+	marked    []uuid.UUID
 }
 
 func newFakeBots() *fakeBots {
@@ -86,6 +88,13 @@ func (f *fakeBots) SetStudentChat(_ context.Context, _, studentID uuid.UUID, cha
 	return nil
 }
 func (f *fakeBots) ListLinkedChats(context.Context) ([]repo.LinkedChat, error) { return f.linked, nil }
+func (f *fakeBots) DueHomeworkReminders(context.Context, uuid.UUID) ([]entity.HomeworkReminder, error) {
+	return f.reminders, nil
+}
+func (f *fakeBots) MarkHomeworkReminded(_ context.Context, _, id uuid.UUID) error {
+	f.marked = append(f.marked, id)
+	return nil
+}
 func (f *fakeBots) ListObstacleLabels(context.Context, uuid.UUID) ([]string, error) {
 	return nil, nil
 }
@@ -165,6 +174,25 @@ func TestStaleCallback_AcksAndPointsToApp(t *testing.T) {
 	svc.HandleUpdate(context.Background(), cb(100, "m:1")) // leftover score button
 	if !strings.Contains(snd.last(), "ilovada") || !hasAppButton(snd.lastKb()) {
 		t.Errorf("expected use-app nudge + button on stale callback, got %q", snd.last())
+	}
+}
+
+func TestRemindDueHomework_PushesAndMarksOnce(t *testing.T) {
+	svc, snd, bots, _ := newTestSvc()
+	aid := uuid.New()
+	bots.reminders = []entity.HomeworkReminder{
+		{AssignmentID: aid, Title: "Algebra 5", ChatID: 100},
+		{AssignmentID: aid, Title: "Algebra 5", ChatID: 200}, // same assignment, 2nd recipient
+	}
+	n, err := svc.RemindDueHomework(context.Background(), uuid.New())
+	if err != nil || n != 2 {
+		t.Fatalf("n=%d err=%v, want 2/nil", n, err)
+	}
+	if !strings.Contains(snd.last(), "Algebra 5") || !hasAppButton(snd.lastKb()) {
+		t.Errorf("expected deadline msg + app button, got %q", snd.last())
+	}
+	if len(bots.marked) != 1 || bots.marked[0] != aid {
+		t.Errorf("assignment should be marked exactly once, got %v", bots.marked)
 	}
 }
 

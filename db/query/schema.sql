@@ -236,6 +236,7 @@ CREATE TABLE homework_assignments (
     description text NOT NULL DEFAULT '',
     deadline    timestamptz,
     max_score   int NOT NULL DEFAULT 100,
+    reminded_at timestamptz,
     created_at  timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX idx_hw_assignments_group ON homework_assignments(group_id);

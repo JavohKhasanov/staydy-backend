@@ -397,6 +397,9 @@ type BotRepository interface {
 	GetConversation(ctx context.Context, chatID int64) (BotConversation, error)
 	SetFlow(ctx context.Context, chatID int64, flow, step string, state []byte) error
 	SetStudentChat(ctx context.Context, orgID, studentID uuid.UUID, chatID int64) error
+	// DueHomeworkReminders / MarkHomeworkReminded drive the "deadline in 2h" push, per org.
+	DueHomeworkReminders(ctx context.Context, orgID uuid.UUID) ([]entity.HomeworkReminder, error)
+	MarkHomeworkReminded(ctx context.Context, orgID, assignmentID uuid.UUID) error
 	// ListLinkedChats returns every chat bound to a student (NON-RLS), for the survey broadcast.
 	ListLinkedChats(ctx context.Context) ([]LinkedChat, error)
 	// ListObstacleLabels returns a center's active "biggest obstacle" choices (ordered), for the
